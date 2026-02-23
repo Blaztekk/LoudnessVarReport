@@ -13,10 +13,10 @@ Outil d'analyse des différences sonores entre un pool de fichiers mp3/mp4/mkv
 
 ## Todo
 
-ya moyen de faire une compatibilité pour nos videos mkv ? 
+ya moyen d'assurer une compatibilité pour nos videos mkv ? 
 JOINDRE MEDIA INFO TXT
 
-Mettre un odre / colonne : croissant & décroissant ↑↓
+Mettre un odre / colonne dans les 2 tableaux : croissant & décroissant ↑↓
 
 "Distribution des différences (paires)" dans la section comparaisons 2 / 2
 

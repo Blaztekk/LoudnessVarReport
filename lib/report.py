@@ -410,11 +410,17 @@ tbody tr:hover{background:rgba(255,255,255,.04)}
 hr{border:none; border-top:1px solid rgba(255,255,255,.10); margin:12px 0}
 .controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
 select{
-  background:rgba(255,255,255,.05); color:var(--text);
+  background:#12193a; color:var(--text);
   border:1px solid var(--border); border-radius:10px; padding:8px 10px;
   outline:none;
 }
+select option{background:#12193a; color:var(--text);}
 select:focus{border-color:rgba(122,162,255,.7)}
+th.sortable{cursor:pointer; user-select:none; white-space:nowrap;}
+th.sortable:hover{background:rgba(122,162,255,.12);}
+.sort-ind{opacity:.35; font-size:11px; margin-left:4px;}
+th.sortable[data-sort="asc"] .sort-ind,
+th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 .help{color:var(--muted); font-size:12px; line-height:1.4}
 .metricbox{
   display:inline-block;
@@ -566,7 +572,39 @@ select:focus{border-color:rgba(122,162,255,.7)}
     tip.style.transform = "translateY(6px)";
   }}
 
+  function sortTable(table, col, dir) {{
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort((a, b) => {{
+      const aText = (a.cells[col]?.textContent || '').trim();
+      const bText = (b.cells[col]?.textContent || '').trim();
+      const aNum = parseFloat(aText.replace(',','.'));
+      const bNum = parseFloat(bText.replace(',','.'));
+      const isNum = !isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '';
+      if (isNum) return dir === 'asc' ? aNum - bNum : bNum - aNum;
+      return dir === 'asc' ? aText.localeCompare(bText, 'fr') : bText.localeCompare(aText, 'fr');
+    }});
+    rows.forEach(r => tbody.appendChild(r));
+  }}
+
   document.addEventListener("DOMContentLoaded", () => {{
+    document.querySelectorAll('th.sortable').forEach(th => {{
+      th.addEventListener('click', () => {{
+        const table = th.closest('table');
+        const col = Array.from(th.parentElement.children).indexOf(th);
+        const dir = th.dataset.sort === 'asc' ? 'desc' : 'asc';
+        table.querySelectorAll('th.sortable').forEach(t => {{
+          t.dataset.sort = '';
+          const ind = t.querySelector('.sort-ind');
+          if (ind) ind.textContent = '↕';
+        }});
+        th.dataset.sort = dir;
+        const ind = th.querySelector('.sort-ind');
+        if (ind) ind.textContent = dir === 'asc' ? '↑' : '↓';
+        sortTable(table, col, dir);
+      }});
+    }});
+
     document.querySelectorAll(".thhelp[data-tip]").forEach(el => {{
       const text = el.getAttribute("data-tip");
       el.addEventListener("mousemove", (e) => showTooltip(e, text));
@@ -616,18 +654,6 @@ select:focus{border-color:rgba(122,162,255,.7)}
     </div>
 
     <div class="section">
-      <div class="card">
-        <div class="kpi-title">Distribution des diff\u00e9rences (paires)</div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px">
-          {hist_lines}
-        </div>
-        <div class="small" style="margin-top:8px">
-          Heuristique "globalement m\u00eame niveau" = max(\u0394Max) \u2264 1.5 dB ET \u226580% des paires \u2264 "leger".
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
       <h2>M\u00e9triques par fichier</h2>
       <div class="card" style="margin-bottom:10px">
         <div class="controls">
@@ -645,13 +671,13 @@ select:focus{border-color:rgba(122,162,255,.7)}
         <table>
           <thead>
             <tr>
-              <th>Fichier</th>
-              <th>Type</th>
-              <th class="num">Taille (MB)</th>
-              <th class="num">{th_lufs}</th>
-              <th class="num">{th_tp}</th>
-              <th class="num">{th_lra}</th>
-              <th>Statut</th>
+              <th class="sortable">Fichier <span class="sort-ind">↕</span></th>
+              <th class="sortable">Type <span class="sort-ind">↕</span></th>
+              <th class="num sortable">Taille (MB) <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_lufs} <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_tp} <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_lra} <span class="sort-ind">↕</span></th>
+              <th class="sortable">Statut <span class="sort-ind">↕</span></th>
               <th>Chemin</th>
               <th>Erreur</th>
             </tr>
@@ -665,15 +691,24 @@ select:focus{border-color:rgba(122,162,255,.7)}
 
     <div class="section">
       <h2>Comparaisons 2 par 2</h2>
+      <div class="card" style="margin-bottom:10px">
+        <div class="kpi-title">Distribution des diff\u00e9rences (paires)</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px">
+          {hist_lines}
+        </div>
+        <div class="small" style="margin-top:8px">
+          Heuristique "globalement m\u00eame niveau" = max(\u0394Max) \u2264 1.5 dB ET \u226580% des paires \u2264 "leger".
+        </div>
+      </div>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
-              <th>Fichier A</th><th>Fichier B</th>
-              <th class="num">LUFS A</th><th class="num">LUFS B</th><th class="num">\u0394LUFS (B-A)</th>
-              <th class="num">TP A</th><th class="num">TP B</th><th class="num">\u0394TP (B-A)</th>
-              <th class="num">{th_dmax}</th>
-              <th>{th_sim}</th>
+              <th class="sortable">Fichier A <span class="sort-ind">↕</span></th><th class="sortable">Fichier B <span class="sort-ind">↕</span></th>
+              <th class="num sortable">LUFS A <span class="sort-ind">↕</span></th><th class="num sortable">LUFS B <span class="sort-ind">↕</span></th><th class="num sortable">\u0394LUFS (B-A) <span class="sort-ind">↕</span></th>
+              <th class="num sortable">TP A <span class="sort-ind">↕</span></th><th class="num sortable">TP B <span class="sort-ind">↕</span></th><th class="num sortable">\u0394TP (B-A) <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_dmax} <span class="sort-ind">↕</span></th>
+              <th class="sortable">{th_sim} <span class="sort-ind">↕</span></th>
             </tr>
           </thead>
           <tbody>
