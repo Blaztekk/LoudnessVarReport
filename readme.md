@@ -52,6 +52,8 @@ When you're delivering audio for broadcast, streaming, podcast, or video product
 - Recursive folder scan — works on nested folder structures
 - GUI folder picker (tkinter) with CLI fallback
 
+Note: on **macOS**, some Python installations ship without Tk support, so the folder picker may be unavailable and LoudScan will fall back to the terminal prompt.
+
 ---
 
 ## Supported formats
@@ -68,6 +70,15 @@ When you're delivering audio for broadcast, streaming, podcast, or video product
 git clone https://github.com/YOUR_USERNAME/loudscan.git
 cd loudscan
 python sound_report.py
+```
+
+### Build executables (optional)
+
+Builds are intended to be done locally and uploaded to GitHub Releases.
+
+```bash
+python -m pip install -r requirements-dev.txt
+pyinstaller --clean --noconfirm loudscan.spec
 ```
 
 1. A folder picker dialog opens (or type the path if no GUI is available)

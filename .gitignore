@@ -11,6 +11,9 @@ builds/
 .build_tmp/
 *.spec
 
+# Keep the project's tracked spec file
+!loudscan.spec
+
 # IDE
 .vscode/
 **/tmpclaude-*

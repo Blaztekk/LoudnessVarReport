@@ -8,6 +8,8 @@ def test_command_exists(name: str) -> bool:
 
 
 def select_folder() -> str:
+    gui_reason: str | None = None
+
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -24,10 +26,27 @@ def select_folder() -> str:
 
         if folder and folder.strip():
             return os.path.realpath(folder)
-    except Exception:
-        pass
 
-    print("GUI unavailable. Enter the folder path:", flush=True)
+        gui_reason = "folder selection cancelled"
+    except ImportError as e:
+        gui_reason = f"tkinter not available ({e})"
+    except Exception as e:
+        gui_reason = f"{type(e).__name__}: {e}"
+
+    if gui_reason:
+        print(f"GUI unavailable ({gui_reason}). Enter the folder path:", flush=True)
+        if sys.platform == "darwin" and "tkinter" in gui_reason:
+            print(
+                "macOS hint: tkinter is included with the python.org installer, but may be missing with some Python builds (e.g. Homebrew).",
+                flush=True,
+            )
+            print(
+                "Try: brew install python-tk  (or reinstall Python from https://www.python.org/downloads/mac-osx/)",
+                flush=True,
+            )
+    else:
+        print("GUI unavailable. Enter the folder path:", flush=True)
+
     p = input("Folder: ").strip()
     if not p:
         raise RuntimeError("No folder provided.")
