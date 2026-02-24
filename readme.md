@@ -1,5 +1,4 @@
 # LoudScan
-*Latest version : 1.0.1*
 
 **Batch audio loudness analyser — compare LUFS, True Peak, LRA, RMS and Peak across your entire media library in one interactive HTML report.**
 
