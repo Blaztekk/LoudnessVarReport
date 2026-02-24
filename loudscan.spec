@@ -1,10 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
-from PyInstaller.building.build_main import Analysis, PYZ, EXE
-
-
-block_cipher = None
-
+platform_tag = "windows" if sys.platform == "win32" else "macos"
 
 a = Analysis(
     ["sound_report.py"],
@@ -16,13 +13,10 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -30,7 +24,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="LoudScan",
+    name=f"LoudScan-{platform_tag}",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
