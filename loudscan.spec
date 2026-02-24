@@ -1,7 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 import sys
 
 platform_tag = "windows" if sys.platform == "win32" else "macos"
+version_tag = os.environ.get("LOUDSCAN_VERSION")
 
 a = Analysis(
     ["sound_report.py"],
@@ -24,7 +26,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name=f"LoudScan-{platform_tag}",
+    name=f"LoudScan-{platform_tag}" + (f"-{version_tag}" if version_tag else ""),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

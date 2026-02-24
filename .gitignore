@@ -18,3 +18,4 @@ builds/
 # IDE
 .vscode/
 **/tmpclaude-*
+.github/copilot-instructions.md

@@ -6,6 +6,32 @@ echo " LoudScan - macOS Build"
 echo "============================================"
 echo
 
+# ── Versioning (stored in version#) ─────────────────────────────────────────
+VERSION_OK=1
+CURRENT_VERSION=""
+NEXT_VERSION=""
+
+if [[ ! -f "version#" ]]; then
+    echo "ERROR: version# not found. Building without version suffix."
+    VERSION_OK=0
+else
+    CURRENT_VERSION=$(tr -d '\r\n' < "version#" | xargs)
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+    if [[ -z "${MAJOR:-}" || -z "${MINOR:-}" || -z "${PATCH:-}" ]]; then
+        echo "ERROR: Invalid version in version#: '$CURRENT_VERSION'. Building without version suffix."
+        VERSION_OK=0
+    elif ! [[ "$MAJOR" =~ ^[0-9]+$ && "$MINOR" =~ ^[0-9]+$ && "$PATCH" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: Non-numeric version in version#: '$CURRENT_VERSION'. Building without version suffix."
+        VERSION_OK=0
+    else
+        NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+        echo "Current version: $CURRENT_VERSION"
+        echo "Next version   : $NEXT_VERSION"
+        echo
+    fi
+fi
+
 # ── Xcode Command Line Tools ──────────────────────────────────────────────────
 if ! xcode-select -p &>/dev/null; then
     echo "ERROR: Xcode Command Line Tools not installed."
@@ -53,12 +79,22 @@ echo "[2/4] Installing build dependencies..."
 pip install -r requirements-dev.txt --quiet
 
 echo "[3/4] Building executable..."
+if [[ "$VERSION_OK" == "1" ]]; then
+    export LOUDSCAN_VERSION="$NEXT_VERSION"
+else
+    unset LOUDSCAN_VERSION
+fi
 PyInstaller \
     --clean \
     --noconfirm \
     --distpath builds/macos \
     --workpath .build_tmp \
     loudscan.spec
+
+# Persist version bump only after a successful build
+if [[ "$VERSION_OK" == "1" ]]; then
+    printf '%s\n' "$NEXT_VERSION" > "version#"
+fi
 
 echo "[4/4] Cleaning up..."
 deactivate
@@ -67,7 +103,11 @@ rm -rf .build_tmp "$VENV_DIR"
 echo
 echo "============================================"
 echo " Build complete!"
-echo " Output: builds/macos/LoudScan-macos"
+if [[ "$VERSION_OK" == "1" ]]; then
+    echo " Output: builds/macos/LoudScan-macos-$NEXT_VERSION"
+else
+    echo " Output: builds/macos/LoudScan-macos"
+fi
 echo "============================================"
 echo
 echo "NOTE: macOS Gatekeeper will block unsigned binaries."
@@ -75,4 +115,8 @@ echo "First-run workaround for your users:"
 echo "  Right-click the file > Open > Open anyway"
 echo "  (only required once)"
 echo
-echo "Upload builds/macos/LoudScan-macos to your GitHub Release."
+if [[ "$VERSION_OK" == "1" ]]; then
+    echo "Upload builds/macos/LoudScan-macos-$NEXT_VERSION to your GitHub Release."
+else
+    echo "Upload builds/macos/LoudScan-macos to your GitHub Release."
+fi
