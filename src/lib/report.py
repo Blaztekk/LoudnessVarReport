@@ -23,11 +23,13 @@ def new_sound_report_data(metrics: list) -> dict:
     if not ok:
         raise RuntimeError("No usable loudnorm measurements (all failed).")
 
-    lufs_vals = [float(m["LUFS_I"]) for m in ok]
-    tp_vals = [float(m["TruePeak_dBTP"]) for m in ok]
-    lra_vals = [float(m["LRA"]) for m in ok]
-    peak_vals = [float(m["Peak_dBFS"]) for m in ok if m.get("Peak_dBFS") is not None]
-    rms_vals  = [float(m["RMS_dBFS"])  for m in ok if m.get("RMS_dBFS")  is not None]
+    lufs_vals  = [float(m["LUFS_I"]) for m in ok]
+    tp_vals    = [float(m["TruePeak_dBTP"]) for m in ok]
+    lra_vals   = [float(m["LRA"]) for m in ok]
+    peak_vals  = [float(m["Peak_dBFS"]) for m in ok if m.get("Peak_dBFS") is not None]
+    rms_vals   = [float(m["RMS_dBFS"])  for m in ok if m.get("RMS_dBFS")  is not None]
+    lufs_m_vals = [float(m["LUFS_M"]) for m in ok if m.get("LUFS_M") is not None]
+    lufs_s_vals = [float(m["LUFS_S"]) for m in ok if m.get("LUFS_S") is not None]
 
     def _mean(vals):
         return sum(vals) / len(vals)
@@ -43,6 +45,8 @@ def new_sound_report_data(metrics: list) -> dict:
             "median": get_median(lufs_vals),
             "std": get_stddev(lufs_vals),
         },
+        "LUFS_M": _safe_stats(lufs_m_vals),
+        "LUFS_S": _safe_stats(lufs_s_vals),
         "TruePeak_dBTP": {
             "mean": _mean(tp_vals),
             "median": get_median(tp_vals),
@@ -70,6 +74,8 @@ def new_sound_report_data(metrics: list) -> dict:
                 "SizeBytes": m["SizeBytes"],
                 "Path": m["Path"],
                 "LUFS_I": None,
+                "LUFS_M": None,
+                "LUFS_S": None,
                 "TruePeak_dBTP": None,
                 "LRA": None,
                 "Peak_dBFS": None,
@@ -77,6 +83,12 @@ def new_sound_report_data(metrics: list) -> dict:
                 "LUFS_DeltaMean": None,
                 "LUFS_DeltaMedian": None,
                 "LUFS_Z": None,
+                "LUFS_M_DeltaMean": None,
+                "LUFS_M_DeltaMedian": None,
+                "LUFS_M_Z": None,
+                "LUFS_S_DeltaMean": None,
+                "LUFS_S_DeltaMedian": None,
+                "LUFS_S_Z": None,
                 "TP_DeltaMean": None,
                 "TP_DeltaMedian": None,
                 "TP_Z": None,
@@ -88,16 +100,32 @@ def new_sound_report_data(metrics: list) -> dict:
             continue
 
         lufs = float(m["LUFS_I"])
-        tp = float(m["TruePeak_dBTP"])
-        lra = float(m["LRA"])
+        tp   = float(m["TruePeak_dBTP"])
+        lra  = float(m["LRA"])
+        lufs_mv = m.get("LUFS_M")
+        lufs_sv = m.get("LUFS_S")
+        lufs_m_val = float(lufs_mv) if lufs_mv is not None else None
+        lufs_s_val = float(lufs_sv) if lufs_sv is not None else None
 
         lufs_std = stats["LUFS_I"]["std"]
-        tp_std = stats["TruePeak_dBTP"]["std"]
-        lra_std = stats["LRA"]["std"]
+        tp_std   = stats["TruePeak_dBTP"]["std"]
+        lra_std  = stats["LRA"]["std"]
 
-        lufs_z = (lufs - stats["LUFS_I"]["mean"]) / lufs_std if lufs_std > 1e-9 else 0.0
-        tp_z = (tp - stats["TruePeak_dBTP"]["mean"]) / tp_std if tp_std > 1e-9 else 0.0
-        lra_z = (lra - stats["LRA"]["mean"]) / lra_std if lra_std > 1e-9 else 0.0
+        lufs_z = (lufs - stats["LUFS_I"]["mean"]) / lufs_std if lufs_std and lufs_std > 1e-9 else 0.0
+        tp_z   = (tp   - stats["TruePeak_dBTP"]["mean"]) / tp_std if tp_std and tp_std > 1e-9 else 0.0
+        lra_z  = (lra  - stats["LRA"]["mean"]) / lra_std if lra_std and lra_std > 1e-9 else 0.0
+
+        def _delta(val, key_mean, key_median):
+            if val is None or stats[key_mean]["mean"] is None:
+                return None, None, None
+            mean_v   = stats[key_mean]["mean"]
+            median_v = stats[key_mean]["median"]
+            std_v    = stats[key_mean]["std"]
+            z = (val - mean_v) / std_v if std_v and std_v > 1e-9 else 0.0
+            return val - mean_v, val - median_v, z
+
+        lufs_m_dm, lufs_m_dmed, lufs_m_z = _delta(lufs_m_val, "LUFS_M", "LUFS_M")
+        lufs_s_dm, lufs_s_dmed, lufs_s_z = _delta(lufs_s_val, "LUFS_S", "LUFS_S")
 
         files_enriched.append({
             "Section": "File",
@@ -106,6 +134,8 @@ def new_sound_report_data(metrics: list) -> dict:
             "SizeBytes": m["SizeBytes"],
             "Path": m["Path"],
             "LUFS_I": lufs,
+            "LUFS_M": lufs_m_val,
+            "LUFS_S": lufs_s_val,
             "TruePeak_dBTP": tp,
             "LRA": lra,
             "Peak_dBFS": m.get("Peak_dBFS"),
@@ -113,6 +143,12 @@ def new_sound_report_data(metrics: list) -> dict:
             "LUFS_DeltaMean": lufs - stats["LUFS_I"]["mean"],
             "LUFS_DeltaMedian": lufs - stats["LUFS_I"]["median"],
             "LUFS_Z": lufs_z,
+            "LUFS_M_DeltaMean": lufs_m_dm,
+            "LUFS_M_DeltaMedian": lufs_m_dmed,
+            "LUFS_M_Z": lufs_m_z,
+            "LUFS_S_DeltaMean": lufs_s_dm,
+            "LUFS_S_DeltaMedian": lufs_s_dmed,
+            "LUFS_S_Z": lufs_s_z,
             "TP_DeltaMean": tp - stats["TruePeak_dBTP"]["mean"],
             "TP_DeltaMedian": tp - stats["TruePeak_dBTP"]["median"],
             "TP_Z": tp_z,
@@ -226,8 +262,10 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
     # CSV
     fieldnames = [
         "Section", "FileName", "Ext", "SizeBytes",
-        "Peak_dBFS", "TruePeak_dBTP", "RMS_dBFS", "LUFS_I", "LRA",
+        "Peak_dBFS", "TruePeak_dBTP", "RMS_dBFS", "LUFS_I", "LUFS_M", "LUFS_S", "LRA",
         "LUFS_DeltaMean", "LUFS_DeltaMedian", "LUFS_Z",
+        "LUFS_M_DeltaMean", "LUFS_M_DeltaMedian", "LUFS_M_Z",
+        "LUFS_S_DeltaMean", "LUFS_S_DeltaMedian", "LUFS_S_Z",
         "TP_DeltaMean", "TP_DeltaMedian", "TP_Z",
         "LRA_DeltaMean", "LRA_DeltaMedian", "LRA_Z",
         "A_File", "B_File", "dLUFS", "dTP", "dMaxAbs", "Similarity",
@@ -242,6 +280,8 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "Ext": r["Ext"],
             "SizeBytes": r["SizeBytes"],
             "LUFS_I": r["LUFS_I"],
+            "LUFS_M": r.get("LUFS_M"),
+            "LUFS_S": r.get("LUFS_S"),
             "TruePeak_dBTP": r["TruePeak_dBTP"],
             "LRA": r["LRA"],
             "Peak_dBFS": r.get("Peak_dBFS"),
@@ -249,6 +289,12 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "LUFS_DeltaMean": r["LUFS_DeltaMean"],
             "LUFS_DeltaMedian": r["LUFS_DeltaMedian"],
             "LUFS_Z": r["LUFS_Z"],
+            "LUFS_M_DeltaMean": r.get("LUFS_M_DeltaMean"),
+            "LUFS_M_DeltaMedian": r.get("LUFS_M_DeltaMedian"),
+            "LUFS_M_Z": r.get("LUFS_M_Z"),
+            "LUFS_S_DeltaMean": r.get("LUFS_S_DeltaMean"),
+            "LUFS_S_DeltaMedian": r.get("LUFS_S_DeltaMedian"),
+            "LUFS_S_Z": r.get("LUFS_S_Z"),
             "TP_DeltaMean": r["TP_DeltaMean"],
             "TP_DeltaMedian": r["TP_DeltaMedian"],
             "TP_Z": r["TP_Z"],
@@ -272,6 +318,8 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "Ext": None,
             "SizeBytes": None,
             "LUFS_I": None,
+            "LUFS_M": None,
+            "LUFS_S": None,
             "TruePeak_dBTP": None,
             "LRA": None,
             "Peak_dBFS": None,
@@ -279,6 +327,12 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "LUFS_DeltaMean": None,
             "LUFS_DeltaMedian": None,
             "LUFS_Z": None,
+            "LUFS_M_DeltaMean": None,
+            "LUFS_M_DeltaMedian": None,
+            "LUFS_M_Z": None,
+            "LUFS_S_DeltaMean": None,
+            "LUFS_S_DeltaMedian": None,
+            "LUFS_S_Z": None,
             "TP_DeltaMean": None,
             "TP_DeltaMedian": None,
             "TP_Z": None,
@@ -348,14 +402,16 @@ def new_sound_report_html(folder: str, report: dict, html_path: str, reference_m
         t = html_escape(tip)
         return f"<span class='thhelp' data-tip='{t}'>{lab} <span class='q'>?</span></span>"
 
-    th_peak = th_help("dBFS (Peak)", "Raw integer peak (volumedetect). \u26a0 Red if \u2265 0 dB = digital clipping!")
-    th_tp   = th_help("dBTP (TruePeak)", "Estimated inter-sample true peak. \u26a0 Red if \u2265 0 dB = digital clipping!")
-    th_rms  = th_help("RMS", "Average RMS level (mean_volume). Equivalent to perceived average power.")
-    th_lufs = th_help("LUFS", "Integrated loudness (EBU R128). Closer to 0 = louder (perceived average).")
-    th_lra  = th_help("LRA", "Loudness Range (dynamics). Higher = more dynamic.")
-    th_path = th_help("Path", "Chemin complet vers le fichier source sur le disque.")
-    th_dmax = th_help("\u0394Max", "Pair distance: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
-    th_sim  = th_help("Similarity", "Heuristic categories based on \u0394Max.")
+    th_peak  = th_help("dBFS (Peak)", "Raw integer peak (volumedetect). \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_tp    = th_help("dBTP (TruePeak)", "Estimated inter-sample true peak. \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_rms   = th_help("RMS", "Average RMS level (mean_volume). Equivalent to perceived average power.")
+    th_lufs  = th_help("LUFS (Integrated)", "Integrated loudness over the full file (EBU R128). Most used for compliance and delivery.")
+    th_lufs_m = th_help("LUFS (Momentary)", "Max momentary loudness (400\u202fms window). Highlights sudden bursts or peaks.")
+    th_lufs_s = th_help("LUFS (Short-Term)", "Max short-term loudness (3\u202fs window). Useful for spotting mid-section shifts.")
+    th_lra   = th_help("LRA", "Loudness Range (dynamics). Higher = more dynamic.")
+    th_path  = th_help("Path", "Chemin complet vers le fichier source sur le disque.")
+    th_dmax  = th_help("\u0394Max", "Pair distance: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
+    th_sim   = th_help("Similarity", "Heuristic categories based on \u0394Max.")
 
     # Metrics rows
     metrics_rows_parts = []
@@ -370,9 +426,22 @@ def new_sound_report_html(folder: str, report: dict, html_path: str, reference_m
             tp   = format_num(float(m["TruePeak_dBTP"]))
             lra  = format_num(float(m["LRA"]))
             tp_clip  = " data-clipping='1'" if float(m["TruePeak_dBTP"]) >= 0 else ""
-            lufs_cell = f"<span class='metricbox' data-metric='LUFS_I' data-value='{lufs}'>{lufs}</span>"
-            tp_cell   = f"<span class='metricbox' data-metric='TruePeak_dBTP' data-value='{tp}'{tp_clip}>{tp}</span>"
-            lra_cell  = f"<span class='metricbox' data-metric='LRA' data-value='{lra}'>{lra}</span>"
+            lufs_cell  = f"<span class='metricbox' data-metric='LUFS_I' data-value='{lufs}'>{lufs}</span>"
+            tp_cell    = f"<span class='metricbox' data-metric='TruePeak_dBTP' data-value='{tp}'{tp_clip}>{tp}</span>"
+            lra_cell   = f"<span class='metricbox' data-metric='LRA' data-value='{lra}'>{lra}</span>"
+
+            raw_lufs_m = m.get("LUFS_M")
+            raw_lufs_s = m.get("LUFS_S")
+            if raw_lufs_m is not None:
+                lufs_m_str  = format_num(float(raw_lufs_m))
+                lufs_m_cell = f"<span class='metricbox' data-metric='LUFS_M' data-value='{lufs_m_str}'>{lufs_m_str}</span>"
+            else:
+                lufs_m_cell = "<span class='metricbox dim'>\u2014</span>"
+            if raw_lufs_s is not None:
+                lufs_s_str  = format_num(float(raw_lufs_s))
+                lufs_s_cell = f"<span class='metricbox' data-metric='LUFS_S' data-value='{lufs_s_str}'>{lufs_s_str}</span>"
+            else:
+                lufs_s_cell = "<span class='metricbox dim'>\u2014</span>"
 
             raw_peak = m.get("Peak_dBFS")
             raw_rms  = m.get("RMS_dBFS")
@@ -388,11 +457,13 @@ def new_sound_report_html(folder: str, report: dict, html_path: str, reference_m
             else:
                 rms_cell = "<span class='metricbox dim'>\u2014</span>"
         else:
-            lufs_cell = "<span class='metricbox dim'>\u2014</span>"
-            tp_cell   = "<span class='metricbox dim'>\u2014</span>"
-            lra_cell  = "<span class='metricbox dim'>\u2014</span>"
-            peak_cell = "<span class='metricbox dim'>\u2014</span>"
-            rms_cell  = "<span class='metricbox dim'>\u2014</span>"
+            lufs_cell   = "<span class='metricbox dim'>\u2014</span>"
+            lufs_m_cell = "<span class='metricbox dim'>\u2014</span>"
+            lufs_s_cell = "<span class='metricbox dim'>\u2014</span>"
+            tp_cell     = "<span class='metricbox dim'>\u2014</span>"
+            lra_cell    = "<span class='metricbox dim'>\u2014</span>"
+            peak_cell   = "<span class='metricbox dim'>\u2014</span>"
+            rms_cell    = "<span class='metricbox dim'>\u2014</span>"
 
         path_txt = html_escape(m.get("Path", ""))
         metrics_rows_parts.append(
@@ -404,10 +475,12 @@ def new_sound_report_html(folder: str, report: dict, html_path: str, reference_m
             f"  <td class='num'>{tp_cell}</td>\n"
             f"  <td class='num'>{rms_cell}</td>\n"
             f"  <td class='num'>{lufs_cell}</td>\n"
+            f"  <td class='num'>{lufs_m_cell}</td>\n"
+            f"  <td class='num'>{lufs_s_cell}</td>\n"
             f"  <td class='num'>{lra_cell}</td>\n"
             f"  <td>{status}</td>\n"
             f"  <td style='max-width:520px; color:#ffb2b2;'>{err_txt}</td>\n"
-            f"  <td class='small' style='color:var(--muted); max-width:400px; word-break:break-all;'>{path_txt}</td>\n"
+            f"  <td class='small' style='color:var(--muted); white-space:nowrap;'>{path_txt}</td>\n"
             f"</tr>"
         )
     metrics_rows = "\n".join(metrics_rows_parts)
@@ -446,7 +519,7 @@ def new_sound_report_html(folder: str, report: dict, html_path: str, reference_m
 }
 *{box-sizing:border-box}
 body{margin:0; font-family:Segoe UI, Arial, sans-serif; background:linear-gradient(180deg,var(--bg),#070b18); color:var(--text)}
-.container{max-width:1280px; margin:0 auto; padding:22px}
+.container{max-width:100%; margin:0 auto; padding:22px}
 .header{display:flex; gap:16px; align-items:flex-start; justify-content:space-between; margin-bottom:16px}
 .h-title{font-size:20px; font-weight:700; margin:0}
 .h-sub{color:var(--muted); margin-top:6px; line-height:1.35}
@@ -456,8 +529,8 @@ body{margin:0; font-family:Segoe UI, Arial, sans-serif; background:linear-gradie
 .kpi-value{font-size:18px; font-weight:700; margin:0}
 .section{margin-top:16px}
 .section h2{font-size:14px; margin:0 0 10px 0; color:var(--muted); font-weight:700; letter-spacing:.02em; text-transform:uppercase}
-.tablewrap{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:14px; overflow:auto}
-table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:1050px}
+.tablewrap{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:14px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:1320px}
 thead th{position:sticky; top:0; background:rgba(10,15,30,.95); backdrop-filter: blur(6px); border-bottom:1px solid var(--border); padding:10px; text-align:left; color:#d8defb; z-index:1}
 tbody td{border-top:1px solid rgba(255,255,255,.06); padding:9px 10px; vertical-align:top}
 tbody tr:hover{background:rgba(255,255,255,.04)}
@@ -850,6 +923,8 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
               <th class="num sortable">{th_tp} <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">{th_rms} <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">{th_lufs} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lufs_m} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lufs_s} <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">{th_lra} <span class="sort-ind">\u2195</span></th>
               <th class="sortable">Status <span class="sort-ind">\u2195</span></th>
               <th>Error</th>
