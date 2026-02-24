@@ -17,5 +17,7 @@ builds/
 
 # IDE
 .vscode/
+.venv/
+.conda/
 **/tmpclaude-*
 .github/copilot-instructions.md

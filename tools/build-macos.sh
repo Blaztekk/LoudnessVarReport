@@ -76,7 +76,7 @@ $PYTHON -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
 echo "[2/4] Installing build dependencies..."
-pip install -r requirements-dev.txt --quiet
+pip install -r requirements.txt --quiet
 
 echo "[3/4] Building executable..."
 if [[ "$VERSION_OK" == "1" ]]; then

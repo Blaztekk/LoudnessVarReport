@@ -209,21 +209,6 @@ Based on `ΔMax = max(|ΔLUFS|, |ΔTruePeak|)`:
 
 ---
 
-## Project structure
-
-```
-loudscan/
-├── sound_report.py          # Entry point
-├── reference_models.json    # Broadcast/streaming reference presets (editable)
-└── lib/
-    ├── ffmpeg_utils.py      # FFmpeg single-pass analysis
-    ├── report.py            # Data processing + HTML/CSV generation
-    ├── stats.py             # Median, std dev, similarity categories
-    └── ui.py                # Folder picker (tkinter / CLI fallback)
-```
-
----
-
 ## License
 
 MIT — free to use, modify and distribute.

@@ -6,10 +6,10 @@ platform_tag = "windows" if sys.platform == "win32" else "macos"
 version_tag = os.environ.get("LOUDSCAN_VERSION")
 
 a = Analysis(
-    ["sound_report.py"],
+    ["src/__main__.py"],
     pathex=["."],
     binaries=[],
-    datas=[("reference_models.json", ".")],
+    datas=[("res/reference_models.json", ".")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
