@@ -53,6 +53,7 @@ When you're delivering audio for broadcast, streaming, podcast, or video product
 - GUI folder picker (tkinter) with CLI fallback
 
 Note: on **macOS**, some Python installations ship without Tk support, so the folder picker may be unavailable and LoudScan will fall back to the terminal prompt.
+If tkinter is unavailable, LoudScan also tries an OS-native dialog (PowerShell on Windows, AppleScript on macOS, zenity on Linux) before falling back to the terminal.
 
 ---
 
