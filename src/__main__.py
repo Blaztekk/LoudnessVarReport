@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""LoudScan - Batch audio loudness analysis and comparison via ffmpeg loudnorm."""
+
+import os
+import sys
+
+# Add script directory to path so relative imports work when run directly
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib.ui import test_command_exists, select_folder
+from lib.ffmpeg_utils import get_loudness_from_file
+from lib.report import new_sound_report_data, write_sound_report_outputs
+
+SUPPORTED_EXTS = {".mp3", ".mp4", ".m4a", ".wav", ".flac", ".ogg", ".mkv", ".mov", ".m4v"}
+
+if not test_command_exists("ffmpeg"):
+    print("ERROR: ffmpeg not found in PATH.", file=sys.stderr)
+    sys.exit(1)
+
+folder = select_folder()
+print(f"Folder: {folder}")
+
+# Collect supported files recursively
+files = []
+for root, _, filenames in os.walk(folder):
+    for name in filenames:
+        ext = os.path.splitext(name)[1].lower()
+        if ext in SUPPORTED_EXTS:
+            files.append(os.path.join(root, name))
+
+files.sort()
+
+if not files:
+    print(f"ERROR: No supported files found in {folder}", file=sys.stderr)
+    sys.exit(1)
+
+total = len(files)
+print(f"Analysing loudness of {total} file(s)...")
+
+metrics = []
+for i, path in enumerate(files):
+    name = os.path.basename(path)
+    ext = os.path.splitext(name)[1].lstrip(".")
+    size = os.path.getsize(path)
+    print(f"[{i + 1}/{total}] {name}")
+    try:
+        m = get_loudness_from_file(path)
+        metrics.append(m)
+    except Exception as e:
+        metrics.append({
+            "FileName": name,
+            "Path": path,
+            "Ext": ext,
+            "SizeBytes": size,
+            "LUFS_I": None,
+            "TruePeak_dBTP": None,
+            "LRA": None,
+            "Peak_dBFS": None,
+            "RMS_dBFS": None,
+            "Error": str(e),
+        })
+
+report = new_sound_report_data(metrics)
+out = write_sound_report_outputs(folder, report)
+
+print("Done. Reports generated:")
+print(f" - HTML: {out['HtmlPath']}")
+print(f" - CSV : {out['CsvPath']}")
