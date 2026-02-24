@@ -32,7 +32,7 @@ def get_loudness_from_file(path: str) -> dict:
     # Parse loudnorm JSON (last JSON block in output)
     matches = re.findall(r"\{[\s\S]*?\}", output)
     if not matches:
-        raise RuntimeError(f"Pas de JSON loudnorm pour: {path}")
+        raise RuntimeError(f"No loudnorm JSON output for: {path}")
     j = json.loads(matches[-1])
 
     # Parse volumedetect stats

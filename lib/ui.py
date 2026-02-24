@@ -17,7 +17,7 @@ def select_folder() -> str:
         root.attributes("-topmost", True)
 
         folder = filedialog.askdirectory(
-            title="Choisis le dossier contenant les fichiers audio/vidéo",
+            title="Select the folder containing your audio/video files",
             mustexist=True,
         )
         root.destroy()
@@ -27,10 +27,10 @@ def select_folder() -> str:
     except Exception:
         pass
 
-    print("UI indisponible. Saisis le chemin du dossier:", flush=True)
-    p = input("Dossier: ").strip()
+    print("GUI unavailable. Enter the folder path:", flush=True)
+    p = input("Folder: ").strip()
     if not p:
-        raise RuntimeError("Aucun dossier fourni.")
+        raise RuntimeError("No folder provided.")
     if not os.path.isdir(p):
-        raise RuntimeError(f"Chemin invalide: {p}")
+        raise RuntimeError(f"Invalid path: {p}")
     return os.path.realpath(p)

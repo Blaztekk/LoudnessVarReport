@@ -20,7 +20,7 @@ def new_sound_report_data(metrics: list) -> dict:
            or m.get("LRA") is None]
 
     if not ok:
-        raise RuntimeError("Aucune mesure loudnorm exploitable (tous en erreur).")
+        raise RuntimeError("No usable loudnorm measurements (all failed).")
 
     lufs_vals = [float(m["LUFS_I"]) for m in ok]
     tp_vals = [float(m["TruePeak_dBTP"]) for m in ok]
@@ -121,7 +121,7 @@ def new_sound_report_data(metrics: list) -> dict:
             "Error": None,
         })
 
-    # Pairwise comparisons (OK only)
+    # Pairwise comparisons (OK files only)
     pairs = []
     for a, b in combinations(ok, 2):
         d_lufs = float(b["LUFS_I"]) - float(a["LUFS_I"])
@@ -141,11 +141,11 @@ def new_sound_report_data(metrics: list) -> dict:
             "B_TP_dBTP": float(b["TruePeak_dBTP"]),
             "dTP": d_tp,
             "dMaxAbs": d_max,
-            "Similarite": cat,
+            "Similarity": cat,
         })
 
     # Global heuristic
-    levels = ["Egal", "imperceptible", "leger", "moyen", "\u00e9lev\u00e9", "\u00e9norme"]
+    levels = ["identical", "negligible", "slight", "moderate", "high", "extreme"]
 
     def level_index(s):
         try:
@@ -153,14 +153,14 @@ def new_sound_report_data(metrics: list) -> dict:
         except ValueError:
             return 999
 
-    ratio_leger_or_less = 1.0
+    ratio_slight_or_less = 1.0
     worst_pair = None
     mean_delta = 0.0
 
     if pairs:
-        leger_idx = level_index("leger")
-        count_leger = sum(1 for p in pairs if level_index(p["Similarite"]) <= leger_idx)
-        ratio_leger_or_less = count_leger / len(pairs)
+        slight_idx = level_index("slight")
+        count_slight = sum(1 for p in pairs if level_index(p["Similarity"]) <= slight_idx)
+        ratio_slight_or_less = count_slight / len(pairs)
         worst_pair = max(pairs, key=lambda p: p["dMaxAbs"])
         mean_delta = sum(p["dMaxAbs"] for p in pairs) / len(pairs)
 
@@ -169,7 +169,7 @@ def new_sound_report_data(metrics: list) -> dict:
         or (
             worst_pair is not None
             and worst_pair["dMaxAbs"] <= 1.5
-            and ratio_leger_or_less >= 0.80
+            and ratio_slight_or_less >= 0.80
         )
     )
 
@@ -185,7 +185,7 @@ def new_sound_report_data(metrics: list) -> dict:
             "FilesOk": len(ok),
             "FilesErr": len(err),
             "Pairs": len(pairs),
-            "RatioLegerOrLess": ratio_leger_or_less,
+            "RatioSlightOrLess": ratio_slight_or_less,
             "MeanDelta": mean_delta,
             "MaxDelta": worst_pair["dMaxAbs"] if worst_pair else None,
             "WorstPair": worst_pair,
@@ -206,7 +206,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
         "LUFS_DeltaMean", "LUFS_DeltaMedian", "LUFS_Z",
         "TP_DeltaMean", "TP_DeltaMedian", "TP_Z",
         "LRA_DeltaMean", "LRA_DeltaMedian", "LRA_Z",
-        "A_File", "B_File", "dLUFS", "dTP", "dMaxAbs", "Similarite",
+        "A_File", "B_File", "dLUFS", "dTP", "dMaxAbs", "Similarity",
         "Error",
     ]
 
@@ -236,7 +236,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "dLUFS": None,
             "dTP": None,
             "dMaxAbs": None,
-            "Similarite": None,
+            "Similarity": None,
             "Error": r["Error"],
         })
 
@@ -265,7 +265,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "dLUFS": p["dLUFS"],
             "dTP": p["dTP"],
             "dMaxAbs": p["dMaxAbs"],
-            "Similarite": p["Similarite"],
+            "Similarity": p["Similarity"],
             "Error": None,
         })
 
@@ -285,16 +285,16 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
     stats = report["Stats"]
     stats_json = json.dumps(stats, ensure_ascii=False)
 
-    levels = ["Egal", "imperceptible", "leger", "moyen", "\u00e9lev\u00e9", "\u00e9norme"]
+    levels = ["identical", "negligible", "slight", "moderate", "high", "extreme"]
     level_counts = {l: 0 for l in levels}
     for p in report["Pairs"]:
-        s = p["Similarite"]
+        s = p["Similarity"]
         if s in level_counts:
             level_counts[s] += 1
 
     hist_lines = "\n".join(
         f"<div class='badge'><span class='tag {l}'>{l}</span>"
-        f"<span class='small'>{level_counts[l]} paire(s)</span></div>"
+        f"<span class='small'>{level_counts[l]} pair(s)</span></div>"
         for l in levels
     )
 
@@ -305,13 +305,13 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
             f"(\u0394Max={format_num(wp['dMaxAbs'])})"
         )
     else:
-        worst_txt = "N/A (moins de 2 fichiers mesurables)"
+        worst_txt = "N/A (fewer than 2 measurable files)"
 
     generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     scale_text = (
-        "Egal &lt;0.10 | imperceptible &lt;0.50 | leger &lt;1.50 | "
-        "moyen &lt;3.00 | \u00e9lev\u00e9 &lt;6.00 | \u00e9norme \u22656.00 "
-        "(dB, sur max(|\u0394LUFS|,|\u0394TruePeak|))"
+        "identical &lt;0.10 | negligible &lt;0.50 | slight &lt;1.50 | "
+        "moderate &lt;3.00 | high &lt;6.00 | extreme \u22656.00 "
+        "(dB, on max(|\u0394LUFS|,|\u0394TruePeak|))"
     )
 
     def th_help(label, tip):
@@ -319,20 +319,20 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
         t = html_escape(tip)
         return f"<span class='thhelp' data-tip='{t}'>{lab} <span class='q'>?</span></span>"
 
-    th_lufs = th_help("LUFS_I", "Loudness int\u00e9gr\u00e9e (LUFS, EBU R128). Plus proche de 0 = plus fort (moyenne per\u00e7ue).")
-    th_tp   = th_help("TruePeak (dBTP)", "Pic vrai estim\u00e9 (intersample). \u26a0 Rouge si \u2265 0 dB = saturation num\u00e9rique !")
-    th_lra  = th_help("LRA", "Loudness Range (dynamique). Plus grand = plus dynamique.")
-    th_peak = th_help("Peak (dBFS)", "Pic entier brut (volumedetect). \u26a0 Rouge si \u2265 0 dB = saturation num\u00e9rique !")
-    th_rms  = th_help("RMS (dBFS)", "Niveau RMS moyen (volumedetect). \u00c9quivalent puissance moyenne per\u00e7ue.")
-    th_dmax = th_help("\u0394Max", "Distance paires: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
-    th_sim  = th_help("Similarit\u00e9", "Cat\u00e9gories heuristiques sur \u0394Max.")
+    th_lufs = th_help("LUFS_I", "Integrated loudness (LUFS, EBU R128). Closer to 0 = louder (perceived average).")
+    th_tp   = th_help("TruePeak (dBTP)", "Estimated inter-sample true peak. \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_lra  = th_help("LRA", "Loudness Range (dynamics). Higher = more dynamic.")
+    th_peak = th_help("Peak (dBFS)", "Raw integer peak (volumedetect). \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_rms  = th_help("RMS (dBFS)", "Average RMS level (volumedetect). Equivalent to perceived average power.")
+    th_dmax = th_help("\u0394Max", "Pair distance: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
+    th_sim  = th_help("Similarity", "Heuristic categories based on \u0394Max.")
 
     # Metrics rows
     metrics_rows_parts = []
     for m in sorted(report["Metrics"], key=lambda x: x["FileName"]):
         err_txt = html_escape(m["Error"]) if m.get("Error") else ""
-        status = ("<span class='tag Erreur'>Erreur</span>" if err_txt
-                  else "<span class='tag Egal'>OK</span>")
+        status = ("<span class='tag error'>Error</span>" if err_txt
+                  else "<span class='tag identical'>OK</span>")
         size_mb = f"{m['SizeBytes'] / (1024 * 1024):.2f}"
 
         if not err_txt:
@@ -383,7 +383,7 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
     # Pairs rows
     pairs_rows_parts = []
     for p in sorted(report["Pairs"], key=lambda x: -x["dMaxAbs"]):
-        sim_cls = p["Similarite"]
+        sim_cls = p["Similarity"]
         pairs_rows_parts.append(
             f"<tr>\n"
             f"  <td>{html_escape(p['A_File'])}</td>\n"
@@ -402,15 +402,15 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
     if pairs_rows_parts:
         pairs_rows = "\n".join(pairs_rows_parts)
     else:
-        pairs_rows = "<tr><td colspan='10' class='small'>Pas assez de fichiers mesur\u00e9s pour faire des paires.</td></tr>"
+        pairs_rows = "<tr><td colspan='10' class='small'>Not enough measured files to generate pairs.</td></tr>"
 
-    global_same_txt = "Oui" if report["Summary"]["GlobalSame"] else "Non"
+    global_same_txt = "Yes" if report["Summary"]["GlobalSame"] else "No"
 
     css = """\
 <style>
 :root{
   --bg:#0b1020; --text:#e7ecff; --muted:#aab3d6; --border:rgba(255,255,255,.10); --accent:#7aa2ff;
-  --Egal:#1f8a3b; --imperceptible:#4aa334; --leger:#b38a00; --moyen:#d66a00; --\u00e9lev\u00e9:#d13939; --\u00e9norme:#a31f1f; --Erreur:#666;
+  --identical:#1f8a3b; --negligible:#4aa334; --slight:#b38a00; --moderate:#d66a00; --high:#d13939; --extreme:#a31f1f; --error:#666;
 }
 *{box-sizing:border-box}
 body{margin:0; font-family:Segoe UI, Arial, sans-serif; background:linear-gradient(180deg,var(--bg),#070b18); color:var(--text)}
@@ -433,13 +433,13 @@ tbody tr:hover{background:rgba(255,255,255,.04)}
 .badge{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.04); font-weight:600; font-size:12px}
 .dot{width:10px; height:10px; border-radius:99px; background:var(--accent)}
 .tag{display:inline-block; padding:4px 10px; border-radius:999px; font-weight:700; color:#fff; font-size:12px}
-.tag.Egal{background:var(--Egal)}
-.tag.imperceptible{background:var(--imperceptible)}
-.tag.leger{background:var(--leger)}
-.tag.moyen{background:var(--moyen)}
-.tag.\u00e9lev\u00e9{background:var(--\u00e9lev\u00e9)}
-.tag.\u00e9norme{background:var(--\u00e9norme)}
-.tag.Erreur{background:var(--Erreur)}
+.tag.identical{background:var(--identical)}
+.tag.negligible{background:var(--negligible)}
+.tag.slight{background:var(--slight)}
+.tag.moderate{background:var(--moderate)}
+.tag.high{background:var(--high)}
+.tag.extreme{background:var(--extreme)}
+.tag.error{background:var(--error)}
 .small{color:var(--muted); font-size:12px}
 .grid2{display:grid; grid-template-columns: 1.3fr .7fr; gap:10px}
 hr{border:none; border-top:1px solid rgba(255,255,255,.10); margin:12px 0}
@@ -589,17 +589,17 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 
     const legend = document.getElementById("modeLegend");
     if (method === "zscore"){{
-      legend.textContent = "Couleurs (z-score): bleu=en dessous de la moyenne, vert=proche, rouge=au dessus (\u00e9chelle \u2248 \u00b12\u03c3).";
+      legend.textContent = "Colours (z-score): blue=below average, green=close, red=above (\u2248 \u00b12\u03c3 scale).";
     }} else if (method === "median"){{
-      legend.textContent = "Couleurs (\u0394 vs m\u00e9diane): bleu=en dessous, vert=proche, rouge=au dessus (\u00e9chelle \u2248 \u00b12\u00d7\u03c3, fallback si \u03c3\u22480).";
+      legend.textContent = "Colours (\u0394 vs median): blue=below, green=close, red=above (\u2248 \u00b12\u00d7\u03c3 scale).";
     }} else {{
-      legend.textContent = "Couleurs (\u0394 vs moyenne): bleu=en dessous, vert=proche, rouge=au dessus (\u00e9chelle \u2248 \u00b12\u00d7\u03c3, fallback si \u03c3\u22480).";
+      legend.textContent = "Colours (\u0394 vs mean): blue=below, green=close, red=above (\u2248 \u00b12\u00d7\u03c3 scale).";
     }}
 
-    // Saturation absolue : rouge si >= 0 dB (priorité maximale, écrase la coloration relative)
+    // Absolute clipping: red if >= 0 dB (highest priority, overrides relative colouring)
     document.querySelectorAll(".metricbox[data-clipping='1']").forEach(el => {{
       el.classList.add("clip-warn");
-      el.title += " \u26a0 SATURATION \u2265 0 dB !";
+      el.title += " \u26a0 CLIPPING \u2265 0 dB!";
     }});
     document.querySelectorAll(".metricbox:not([data-clipping='1'])").forEach(el => {{
       el.classList.remove("clip-warn");
@@ -634,7 +634,7 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
       const bNum = parseFloat(bText.replace(',','.'));
       const isNum = !isNaN(aNum) && !isNaN(bNum) && aText !== '' && bText !== '';
       if (isNum) return dir === 'asc' ? aNum - bNum : bNum - aNum;
-      return dir === 'asc' ? aText.localeCompare(bText, 'fr') : bText.localeCompare(aText, 'fr');
+      return dir === 'asc' ? aText.localeCompare(bText, 'en') : bText.localeCompare(aText, 'en');
     }});
     rows.forEach(r => tbody.appendChild(r));
   }}
@@ -648,11 +648,11 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
         table.querySelectorAll('th.sortable').forEach(t => {{
           t.dataset.sort = '';
           const ind = t.querySelector('.sort-ind');
-          if (ind) ind.textContent = '↕';
+          if (ind) ind.textContent = '\u2195';
         }});
         th.dataset.sort = dir;
         const ind = th.querySelector('.sort-ind');
-        if (ind) ind.textContent = dir === 'asc' ? '↑' : '↓';
+        if (ind) ind.textContent = dir === 'asc' ? '\u2191' : '\u2193';
         sortTable(table, col, dir);
       }});
     }});
@@ -673,46 +673,46 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 
     html_out = f"""\
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sound report</title>
+<title>LoudScan Report</title>
 {css}
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div>
-        <div class="badge"><span class="dot"></span> Rapport audio</div>
-        <h1 class="h-title">Comparatif niveau sonore (ffmpeg loudnorm)</h1>
+        <div class="badge"><span class="dot"></span> Audio Report</div>
+        <h1 class="h-title">Loudness Level Comparison (ffmpeg loudnorm)</h1>
         <div class="h-sub">
-          <div><b>Dossier</b> : {html_escape(folder)}</div>
-          <div><b>G\u00e9n\u00e9r\u00e9</b> : {generated}</div>
-          <div><b>\u00c9chelle paires</b> : {scale_text}</div>
+          <div><b>Folder</b>: {html_escape(folder)}</div>
+          <div><b>Generated</b>: {generated}</div>
+          <div><b>Pair scale</b>: {scale_text}</div>
         </div>
       </div>
       <div class="badge">
-        <span class="small">Globalement m\u00eame niveau :</span>
+        <span class="small">Globally same level:</span>
         <span style="font-size:13px; font-weight:800;">{global_same_txt}</span>
       </div>
     </div>
 
     <div class="kpis">
-      <div class="card"><div class="kpi-title">Fichiers d\u00e9tect\u00e9s</div><div class="kpi-value">{report["Summary"]["FilesTotal"]}</div></div>
-      <div class="card"><div class="kpi-title">Fichiers mesur\u00e9s (OK)</div><div class="kpi-value">{report["Summary"]["FilesOk"]}</div></div>
-      <div class="card"><div class="kpi-title">Comparaisons (paires)</div><div class="kpi-value">{report["Summary"]["Pairs"]}</div></div>
-      <div class="card"><div class="kpi-title">Pire paire (\u0394Max)</div><div class="kpi-value" style="font-size:13px">{worst_txt}</div></div>
+      <div class="card"><div class="kpi-title">Files detected</div><div class="kpi-value">{report["Summary"]["FilesTotal"]}</div></div>
+      <div class="card"><div class="kpi-title">Files measured (OK)</div><div class="kpi-value">{report["Summary"]["FilesOk"]}</div></div>
+      <div class="card"><div class="kpi-title">Comparisons (pairs)</div><div class="kpi-value">{report["Summary"]["Pairs"]}</div></div>
+      <div class="card"><div class="kpi-title">Worst pair (\u0394Max)</div><div class="kpi-value" style="font-size:13px">{worst_txt}</div></div>
     </div>
 
     <div class="section">
-      <h2>M\u00e9triques par fichier</h2>
+      <h2>Per-file metrics</h2>
       <div class="card" style="margin-bottom:10px">
         <div class="controls">
-          <div class="small"><b>Coloration:</b></div>
-          <select id="refMode" aria-label="Mode de r\u00e9f\u00e9rence">
-            <option value="median" selected>M\u00e9diane (\u0394)</option>
-            <option value="mean">Moyenne (\u0394)</option>
+          <div class="small"><b>Colouring:</b></div>
+          <select id="refMode" aria-label="Reference mode">
+            <option value="median" selected>Median (\u0394)</option>
+            <option value="mean">Mean (\u0394)</option>
             <option value="zscore">Z-score (\u03c3)</option>
           </select>
           <div class="help" id="modeLegend"></div>
@@ -723,16 +723,16 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
         <table>
           <thead>
             <tr>
-              <th class="sortable">Fichier <span class="sort-ind">↕</span></th>
-              <th class="sortable">Type <span class="sort-ind">↕</span></th>
-              <th class="num sortable">Taille (MB) <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_lufs} <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_tp} <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_lra} <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_peak} <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_rms} <span class="sort-ind">↕</span></th>
-              <th class="sortable">Statut <span class="sort-ind">↕</span></th>
-              <th>Erreur</th>
+              <th class="sortable">File <span class="sort-ind">\u2195</span></th>
+              <th class="sortable">Type <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">Size (MB) <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lufs} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_tp} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lra} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_peak} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_rms} <span class="sort-ind">\u2195</span></th>
+              <th class="sortable">Status <span class="sort-ind">\u2195</span></th>
+              <th>Error</th>
             </tr>
           </thead>
           <tbody>
@@ -743,25 +743,25 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
     </div>
 
     <div class="section">
-      <h2>Comparaisons 2 par 2</h2>
+      <h2>Pairwise comparisons</h2>
       <div class="card" style="margin-bottom:10px">
-        <div class="kpi-title">Distribution des diff\u00e9rences (paires)</div>
+        <div class="kpi-title">Difference distribution (pairs)</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px">
           {hist_lines}
         </div>
         <div class="small" style="margin-top:8px">
-          Heuristique "globalement m\u00eame niveau" = max(\u0394Max) \u2264 1.5 dB ET \u226580% des paires \u2264 "leger".
+          "Globally same level" heuristic = max(\u0394Max) \u2264 1.5 dB AND \u226580% of pairs \u2264 "slight".
         </div>
       </div>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
-              <th class="sortable">Fichier A <span class="sort-ind">↕</span></th><th class="sortable">Fichier B <span class="sort-ind">↕</span></th>
-              <th class="num sortable">LUFS A <span class="sort-ind">↕</span></th><th class="num sortable">LUFS B <span class="sort-ind">↕</span></th><th class="num sortable">\u0394LUFS (B-A) <span class="sort-ind">↕</span></th>
-              <th class="num sortable">TP A <span class="sort-ind">↕</span></th><th class="num sortable">TP B <span class="sort-ind">↕</span></th><th class="num sortable">\u0394TP (B-A) <span class="sort-ind">↕</span></th>
-              <th class="num sortable">{th_dmax} <span class="sort-ind">↕</span></th>
-              <th class="sortable">{th_sim} <span class="sort-ind">↕</span></th>
+              <th class="sortable">File A <span class="sort-ind">\u2195</span></th><th class="sortable">File B <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">LUFS A <span class="sort-ind">\u2195</span></th><th class="num sortable">LUFS B <span class="sort-ind">\u2195</span></th><th class="num sortable">\u0394LUFS (B-A) <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">TP A <span class="sort-ind">\u2195</span></th><th class="num sortable">TP B <span class="sort-ind">\u2195</span></th><th class="num sortable">\u0394TP (B-A) <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_dmax} <span class="sort-ind">\u2195</span></th>
+              <th class="sortable">{th_sim} <span class="sort-ind">\u2195</span></th>
             </tr>
           </thead>
           <tbody>
@@ -772,7 +772,7 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
     </div>
 
     <div class="footer">
-      G\u00e9n\u00e9r\u00e9 par ffmpeg loudnorm (analyse) \u2022 {html_escape(html_path)}
+      Generated by ffmpeg loudnorm &bull; {html_escape(html_path)}
     </div>
   </div>
 

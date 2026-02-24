@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SoundReport - Analyse et comparaison des niveaux sonores via ffmpeg loudnorm."""
+"""LoudScan - Batch audio loudness analysis and comparison via ffmpeg loudnorm."""
 
 import os
 import sys
@@ -16,11 +16,11 @@ SUPPORTED_EXTS = {".mp3", ".mp4", ".m4a", ".wav", ".flac", ".ogg", ".mkv", ".mov
 
 def main():
     if not test_command_exists("ffmpeg"):
-        print("ERREUR: ffmpeg introuvable dans PATH.", file=sys.stderr)
+        print("ERROR: ffmpeg not found in PATH.", file=sys.stderr)
         sys.exit(1)
 
     folder = select_folder()
-    print(f"Dossier: {folder}")
+    print(f"Folder: {folder}")
 
     # Collect supported files recursively
     files = []
@@ -33,11 +33,11 @@ def main():
     files.sort()
 
     if not files:
-        print(f"ERREUR: Aucun fichier supporté dans {folder}", file=sys.stderr)
+        print(f"ERROR: No supported files found in {folder}", file=sys.stderr)
         sys.exit(1)
 
     total = len(files)
-    print(f"Analyse loudness de {total} fichier(s)...")
+    print(f"Analysing loudness of {total} file(s)...")
 
     metrics = []
     for i, path in enumerate(files):
@@ -65,7 +65,7 @@ def main():
     report = new_sound_report_data(metrics)
     out = write_sound_report_outputs(folder, report)
 
-    print("OK. Sorties générées :")
+    print("Done. Reports generated:")
     print(f" - HTML: {out['HtmlPath']}")
     print(f" - CSV : {out['CsvPath']}")
 

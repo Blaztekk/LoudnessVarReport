@@ -26,17 +26,17 @@ def get_stddev(values: List[float]) -> float:
 def get_diff_category(delta_lufs: float, delta_tp: float) -> str:
     d = max(abs(delta_lufs), abs(delta_tp))
     if d < 0.10:
-        return "Egal"
+        return "identical"
     elif d < 0.50:
-        return "imperceptible"
+        return "negligible"
     elif d < 1.50:
-        return "leger"
+        return "slight"
     elif d < 3.00:
-        return "moyen"
+        return "moderate"
     elif d < 6.00:
-        return "\u00e9lev\u00e9"
+        return "high"
     else:
-        return "\u00e9norme"
+        return "extreme"
 
 
 def html_escape(s: str) -> str:
