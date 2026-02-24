@@ -6,6 +6,10 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+dist/
+builds/
+.build_tmp/
+*.spec
 
 # IDE
 .vscode/

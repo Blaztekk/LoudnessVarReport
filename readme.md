@@ -6,6 +6,30 @@ Drop a folder full of MP3s, WAVs, MP4s or any other common format and LoudScan w
 
 ---
 
+## Download
+
+> **No Python? No problem.**
+> Pre-built executables are available on the [Releases page](https://github.com/Blaztekk/LoudnessVarReport/releases/latest) — just download, install FFmpeg, and run.
+
+| Platform | File |
+|---|---|
+| Windows | `LoudScan-windows.exe` |
+| macOS | `LoudScan-macos` |
+
+**FFmpeg is required on all platforms** (the app calls it at runtime — it is not bundled).
+
+```bash
+# Windows (winget)
+winget install ffmpeg
+
+# macOS (Homebrew)
+brew install ffmpeg
+```
+
+Then just double-click the executable or run it from a terminal.
+
+---
+
 ## Why LoudScan?
 
 When you're delivering audio for broadcast, streaming, podcast, or video production, consistent loudness matters. LoudScan lets you:
@@ -36,29 +60,13 @@ When you're delivering audio for broadcast, streaming, podcast, or video product
 
 ---
 
-## Requirements
+## Run from source
 
-- Python 3.8+
-- [FFmpeg](https://ffmpeg.org/download.html) — must be in your `PATH`
-
-No extra Python packages needed (standard library only).
-
----
-
-## Installation
+**Requirements:** Python 3.8+ · [FFmpeg](https://ffmpeg.org/download.html) in `PATH` · No pip packages needed
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/loudscan.git
 cd loudscan
-```
-
-That's it. No `pip install` required.
-
----
-
-## Usage
-
-```bash
 python sound_report.py
 ```
 
@@ -131,3 +139,7 @@ MIT — free to use, modify and distribute.
 ## Contributing
 
 Issues and pull requests are welcome. If you encounter a file format that fails to analyse, please open an issue and include the FFmpeg version and file codec info (`ffprobe -v quiet -show_streams your_file`).
+
+---
+
+*Open source · Built with the assistance and virtual hands of AI*
