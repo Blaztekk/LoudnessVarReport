@@ -9,6 +9,7 @@ build/
 dist/
 builds/
 .build_tmp/
+.venv-build/
 *.spec
 
 # Keep the project's tracked spec file
