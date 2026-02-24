@@ -195,13 +195,13 @@ def new_sound_report_data(metrics: list) -> dict:
 
 
 def write_sound_report_outputs(folder: str, report: dict) -> dict:
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%d-%m-%y_%H-%M")
     html_path = os.path.join(folder, f"sound_report_{ts}.html")
     csv_path = os.path.join(folder, f"sound_report_{ts}.csv")
 
     # CSV
     fieldnames = [
-        "Section", "FileName", "Ext", "SizeBytes", "Path",
+        "Section", "FileName", "Ext", "SizeBytes",
         "LUFS_I", "TruePeak_dBTP", "LRA", "Peak_dBFS", "RMS_dBFS",
         "LUFS_DeltaMean", "LUFS_DeltaMedian", "LUFS_Z",
         "TP_DeltaMean", "TP_DeltaMedian", "TP_Z",
@@ -217,7 +217,6 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "FileName": r["FileName"],
             "Ext": r["Ext"],
             "SizeBytes": r["SizeBytes"],
-            "Path": r["Path"],
             "LUFS_I": r["LUFS_I"],
             "TruePeak_dBTP": r["TruePeak_dBTP"],
             "LRA": r["LRA"],
@@ -247,7 +246,6 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "FileName": None,
             "Ext": None,
             "SizeBytes": None,
-            "Path": None,
             "LUFS_I": None,
             "TruePeak_dBTP": None,
             "LRA": None,
@@ -377,7 +375,6 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
             f"  <td class='num'>{peak_cell}</td>\n"
             f"  <td class='num'>{rms_cell}</td>\n"
             f"  <td>{status}</td>\n"
-            f"  <td style='max-width:520px; word-break:break-all;'>{html_escape(m['Path'])}</td>\n"
             f"  <td style='max-width:520px; color:#ffb2b2;'>{err_txt}</td>\n"
             f"</tr>"
         )
@@ -735,7 +732,6 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
               <th class="num sortable">{th_peak} <span class="sort-ind">↕</span></th>
               <th class="num sortable">{th_rms} <span class="sort-ind">↕</span></th>
               <th class="sortable">Statut <span class="sort-ind">↕</span></th>
-              <th>Chemin</th>
               <th>Erreur</th>
             </tr>
           </thead>

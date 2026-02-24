@@ -36,14 +36,15 @@ def main():
         print(f"ERREUR: Aucun fichier supporté dans {folder}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Analyse loudness de {len(files)} fichier(s)...")
+    total = len(files)
+    print(f"Analyse loudness de {total} fichier(s)...")
 
     metrics = []
-    for path in files:
+    for i, path in enumerate(files):
         name = os.path.basename(path)
         ext = os.path.splitext(name)[1].lstrip(".")
         size = os.path.getsize(path)
-        print(f" - {name}")
+        print(f"[{i + 1}/{total}] {name}")
         try:
             m = get_loudness_from_file(path)
             metrics.append(m)
@@ -56,6 +57,8 @@ def main():
                 "LUFS_I": None,
                 "TruePeak_dBTP": None,
                 "LRA": None,
+                "Peak_dBFS": None,
+                "RMS_dBFS": None,
                 "Error": str(e),
             })
 
