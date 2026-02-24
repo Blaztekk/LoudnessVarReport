@@ -9,7 +9,7 @@ a = Analysis(
     ["sound_report.py"],
     pathex=["."],
     binaries=[],
-    datas=[],
+    datas=[("reference_models.json", ".")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

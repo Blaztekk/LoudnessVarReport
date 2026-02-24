@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import sys
 from datetime import datetime
 from itertools import combinations
 from typing import List, Optional
@@ -195,6 +196,29 @@ def new_sound_report_data(metrics: list) -> dict:
 
 
 def write_sound_report_outputs(folder: str, report: dict) -> dict:
+    # Resolve reference_models.json with priority:
+    #  1. Next to the executable (user-editable override)
+    #  2. Bundled inside the PyInstaller archive (_MEIPASS)
+    #  3. Project root when running from source
+    def _find_json():
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(sys.executable)
+            candidate = os.path.join(exe_dir, "reference_models.json")
+            if os.path.exists(candidate):
+                return candidate
+            bundled = os.path.join(sys._MEIPASS, "reference_models.json")
+            return bundled if os.path.exists(bundled) else None
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidate = os.path.join(root, "reference_models.json")
+        return candidate if os.path.exists(candidate) else None
+
+    _json_path = _find_json()
+    if _json_path:
+        with open(_json_path, encoding="utf-8") as _f:
+            reference_models = json.load(_f)
+    else:
+        reference_models = {"version": 1, "presets": []}
+
     ts = datetime.now().strftime("%d-%m-%y_%H-%M")
     html_path = os.path.join(folder, f"sound_report_{ts}.html")
     csv_path = os.path.join(folder, f"sound_report_{ts}.csv")
@@ -202,12 +226,12 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
     # CSV
     fieldnames = [
         "Section", "FileName", "Ext", "SizeBytes",
-        "LUFS_I", "TruePeak_dBTP", "LRA", "Peak_dBFS", "RMS_dBFS",
+        "Peak_dBFS", "TruePeak_dBTP", "RMS_dBFS", "LUFS_I", "LRA",
         "LUFS_DeltaMean", "LUFS_DeltaMedian", "LUFS_Z",
         "TP_DeltaMean", "TP_DeltaMedian", "TP_Z",
         "LRA_DeltaMean", "LRA_DeltaMedian", "LRA_Z",
         "A_File", "B_File", "dLUFS", "dTP", "dMaxAbs", "Similarity",
-        "Error",
+        "Error", "Path",
     ]
 
     csv_rows = []
@@ -238,6 +262,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "dMaxAbs": None,
             "Similarity": None,
             "Error": r["Error"],
+            "Path": r.get("Path", ""),
         })
 
     for p in report["Pairs"]:
@@ -267,6 +292,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "dMaxAbs": p["dMaxAbs"],
             "Similarity": p["Similarity"],
             "Error": None,
+            "Path": None,
         })
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -274,16 +300,19 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
         writer.writeheader()
         writer.writerows(csv_rows)
 
-    html_content = new_sound_report_html(folder, report, html_path)
+    html_content = new_sound_report_html(folder, report, html_path, reference_models)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
     return {"HtmlPath": html_path, "CsvPath": csv_path}
 
 
-def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
+def new_sound_report_html(folder: str, report: dict, html_path: str, reference_models: dict = None) -> str:
+    if reference_models is None:
+        reference_models = {"version": 1, "presets": []}
     stats = report["Stats"]
     stats_json = json.dumps(stats, ensure_ascii=False)
+    ref_models_json = json.dumps(reference_models, ensure_ascii=False)
 
     levels = ["identical", "negligible", "slight", "moderate", "high", "extreme"]
     level_counts = {l: 0 for l in levels}
@@ -319,11 +348,12 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
         t = html_escape(tip)
         return f"<span class='thhelp' data-tip='{t}'>{lab} <span class='q'>?</span></span>"
 
-    th_lufs = th_help("LUFS_I", "Integrated loudness (LUFS, EBU R128). Closer to 0 = louder (perceived average).")
-    th_tp   = th_help("TruePeak (dBTP)", "Estimated inter-sample true peak. \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_peak = th_help("dBFS (Peak)", "Raw integer peak (volumedetect). \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_tp   = th_help("dBTP (TruePeak)", "Estimated inter-sample true peak. \u26a0 Red if \u2265 0 dB = digital clipping!")
+    th_rms  = th_help("RMS", "Average RMS level (mean_volume). Equivalent to perceived average power.")
+    th_lufs = th_help("LUFS", "Integrated loudness (EBU R128). Closer to 0 = louder (perceived average).")
     th_lra  = th_help("LRA", "Loudness Range (dynamics). Higher = more dynamic.")
-    th_peak = th_help("Peak (dBFS)", "Raw integer peak (volumedetect). \u26a0 Red if \u2265 0 dB = digital clipping!")
-    th_rms  = th_help("RMS (dBFS)", "Average RMS level (volumedetect). Equivalent to perceived average power.")
+    th_path = th_help("Path", "Chemin complet vers le fichier source sur le disque.")
     th_dmax = th_help("\u0394Max", "Pair distance: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
     th_sim  = th_help("Similarity", "Heuristic categories based on \u0394Max.")
 
@@ -364,18 +394,20 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
             peak_cell = "<span class='metricbox dim'>\u2014</span>"
             rms_cell  = "<span class='metricbox dim'>\u2014</span>"
 
+        path_txt = html_escape(m.get("Path", ""))
         metrics_rows_parts.append(
             f"<tr>\n"
             f"  <td>{html_escape(m['FileName'])}</td>\n"
             f"  <td>{html_escape(m['Ext'])}</td>\n"
             f"  <td class='num'>{size_mb}</td>\n"
-            f"  <td class='num'>{lufs_cell}</td>\n"
-            f"  <td class='num'>{tp_cell}</td>\n"
-            f"  <td class='num'>{lra_cell}</td>\n"
             f"  <td class='num'>{peak_cell}</td>\n"
+            f"  <td class='num'>{tp_cell}</td>\n"
             f"  <td class='num'>{rms_cell}</td>\n"
+            f"  <td class='num'>{lufs_cell}</td>\n"
+            f"  <td class='num'>{lra_cell}</td>\n"
             f"  <td>{status}</td>\n"
             f"  <td style='max-width:520px; color:#ffb2b2;'>{err_txt}</td>\n"
+            f"  <td class='small' style='color:var(--muted); max-width:400px; word-break:break-all;'>{path_txt}</td>\n"
             f"</tr>"
         )
     metrics_rows = "\n".join(metrics_rows_parts)
@@ -510,6 +542,7 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 <script>
 (() => {{
   const stats = {stats_json};
+  const refModels = {ref_models_json};
 
   const tip = document.createElement('div');
   tip.className = 'tooltip';
@@ -539,6 +572,64 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
     return {{ bg: rgbCss(base, 0.28), border: rgbCss(base, 0.82) }};
   }}
 
+  function colorForAbsolute(name){{
+    if (name === 'green') return {{ bg: rgbCss(C_GREEN, 0.28), border: rgbCss(C_GREEN, 0.82) }};
+    if (name === 'red')   return {{ bg: rgbCss(C_RED,   0.28), border: rgbCss(C_RED,   0.82) }};
+    if (name === 'blue')  return {{ bg: rgbCss(C_BLUE,  0.28), border: rgbCss(C_BLUE,  0.82) }};
+    return {{ bg: 'rgba(100,110,140,0.15)', border: 'rgba(150,160,190,0.30)' }};
+  }}
+
+  function clearAllColors(){{
+    document.querySelectorAll(".metricbox[data-metric]").forEach(el => {{
+      el.style.backgroundColor = '';
+      el.style.borderColor = '';
+      el.title = '';
+      el.classList.remove("clip-warn");
+    }});
+  }}
+
+  function applyAbsoluteColors(presetId){{
+    const preset = refModels.presets ? refModels.presets.find(p => p.id === presetId) : null;
+    document.querySelectorAll(".metricbox[data-metric][data-value]").forEach(el => {{
+      const metric = el.getAttribute("data-metric");
+      const value  = parseFloat(el.getAttribute("data-value"));
+
+      if (el.getAttribute("data-clipping") === "1") {{
+        el.classList.add("clip-warn");
+        el.title = metric + ': ' + value.toFixed(2) + ' \u26a0 CLIPPING \u2265 0 dB!';
+        return;
+      }}
+      el.classList.remove("clip-warn");
+
+      const thresholds = preset && preset.metrics ? preset.metrics[metric] : null;
+      if (!thresholds) {{
+        el.style.backgroundColor = 'rgba(100,110,140,0.10)';
+        el.style.borderColor = 'rgba(150,160,190,0.25)';
+        el.title = metric + ': ' + value.toFixed(2) + ' (pas de seuil pour ce preset)';
+        return;
+      }}
+
+      const hasMin = thresholds.min != null;
+      const hasMax = thresholds.max != null;
+      let colorName;
+      if      (hasMin && value < thresholds.min) colorName = 'blue';
+      else if (hasMax && value > thresholds.max) colorName = 'red';
+      else if (hasMin || hasMax)                 colorName = 'green';
+      else                                        colorName = 'neutral';
+
+      const c = colorForAbsolute(colorName);
+      el.style.backgroundColor = c.bg;
+      el.style.borderColor = c.border;
+
+      const tipParts = [metric + ': ' + value.toFixed(2)];
+      if (hasMin) tipParts.push('min=' + thresholds.min);
+      if (hasMax) tipParts.push('max=' + thresholds.max);
+      if (thresholds.target != null) tipParts.push('cible=' + thresholds.target);
+      tipParts.push('\u2192 ' + colorName);
+      el.title = tipParts.join(', ');
+    }});
+  }}
+
   function getRef(method, metric){{
     if (!stats[metric]) return 0;
     const v = (method === "median") ? stats[metric].median : stats[metric].mean;
@@ -564,6 +655,25 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 
   function applyColors(){{
     const method = document.getElementById("refMode").value;
+    const legend = document.getElementById("modeLegend");
+
+    if (method === 'none') {{
+      clearAllColors();
+      legend.textContent = 'Colorisation d\u00e9sactiv\u00e9e.';
+      return;
+    }}
+
+    if (method.startsWith('preset:')) {{
+      const presetId = method.slice(7);
+      const preset = refModels.presets ? refModels.presets.find(p => p.id === presetId) : null;
+      applyAbsoluteColors(presetId);
+      const presetLabel = preset ? preset.label : presetId;
+      const presetDesc  = preset && preset.description ? ' \u2014 ' + preset.description : '';
+      legend.textContent = 'Standard\u00a0: ' + presetLabel +
+        '. Bleu\u00a0=\u00a0en-dessous du seuil, Vert\u00a0=\u00a0dans la plage, Rouge\u00a0=\u00a0au-dessus.' + presetDesc;
+      return;
+    }}
+
     document.querySelectorAll(".metricbox[data-metric][data-value]").forEach(el => {{
       const metric = el.getAttribute("data-metric");
       const value = parseFloat(el.getAttribute("data-value"));
@@ -587,7 +697,6 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
       el.title = tipText;
     }});
 
-    const legend = document.getElementById("modeLegend");
     if (method === "zscore"){{
       legend.textContent = "Colours (z-score): blue=below average, green=close, red=above (\u2248 \u00b12\u03c3 scale).";
     }} else if (method === "median"){{
@@ -671,6 +780,11 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
 }})();
 </script>"""
 
+    preset_options_html = "\n".join(
+        f"            <option value='preset:{html_escape(p['id'])}'>{html_escape(p['label'])}</option>"
+        for p in reference_models.get("presets", [])
+    )
+
     html_out = f"""\
 <!doctype html>
 <html lang="en">
@@ -711,9 +825,15 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
         <div class="controls">
           <div class="small"><b>Colouring:</b></div>
           <select id="refMode" aria-label="Reference mode">
-            <option value="median" selected>Median (\u0394)</option>
-            <option value="mean">Mean (\u0394)</option>
-            <option value="zscore">Z-score (\u03c3)</option>
+            <option value="none">Aucun / D&eacute;sactiv&eacute;</option>
+            <optgroup label="Relatif (vs session)">
+              <option value="median" selected>M&eacute;diane (&Delta;)</option>
+              <option value="mean">Moyenne (&Delta;)</option>
+              <option value="zscore">Z-score (&sigma;)</option>
+            </optgroup>
+            <optgroup label="Standards broadcast">
+{preset_options_html}
+            </optgroup>
           </select>
           <div class="help" id="modeLegend"></div>
         </div>
@@ -726,13 +846,14 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
               <th class="sortable">File <span class="sort-ind">\u2195</span></th>
               <th class="sortable">Type <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">Size (MB) <span class="sort-ind">\u2195</span></th>
-              <th class="num sortable">{th_lufs} <span class="sort-ind">\u2195</span></th>
-              <th class="num sortable">{th_tp} <span class="sort-ind">\u2195</span></th>
-              <th class="num sortable">{th_lra} <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">{th_peak} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_tp} <span class="sort-ind">\u2195</span></th>
               <th class="num sortable">{th_rms} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lufs} <span class="sort-ind">\u2195</span></th>
+              <th class="num sortable">{th_lra} <span class="sort-ind">\u2195</span></th>
               <th class="sortable">Status <span class="sort-ind">\u2195</span></th>
               <th>Error</th>
+              <th>{th_path}</th>
             </tr>
           </thead>
           <tbody>

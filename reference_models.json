@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "description": "Broadcast and streaming loudness reference presets for SoundReport. Edit or add to 'presets' freely. Use null to omit a bound on any metric.",
+  "presets": [
+    {
+      "id": "ebu_r128",
+      "label": "EBU R128 (TV Europe)",
+      "description": "Standard broadcast européen EBU R128. Cible -23 LUFS (±1 LU de tolérance). Plafond True Peak à -1 dBTP.",
+      "metrics": {
+        "LUFS_I":        { "min": -24.0, "max": -22.0, "target": -23.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 },
+        "LRA":           { "min": null,  "max": 20.0 }
+      }
+    },
+    {
+      "id": "atsc_a85",
+      "label": "ATSC A/85 (TV US/Canada)",
+      "description": "Standard broadcast nord-américain ATSC A/85. Cible -24 LUFS (dialogue-gated). Plafond True Peak à -2 dBTP.",
+      "metrics": {
+        "LUFS_I":        { "min": -25.0, "max": -23.0, "target": -24.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -2.0 }
+      }
+    },
+    {
+      "id": "spotify",
+      "label": "Spotify",
+      "description": "Spotify normalise la lecture à -14 LUFS. Un contenu entre -18 et -9 LUFS évite les artéfacts de réduction de gain. Plafond True Peak à -1 dBTP recommandé.",
+      "metrics": {
+        "LUFS_I":        { "min": -18.0, "max": -9.0, "target": -14.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 }
+      }
+    },
+    {
+      "id": "apple_music",
+      "label": "Apple Music / iTunes",
+      "description": "Apple Sound Check cible -16 LUFS. Fenêtre de livraison acceptable : -18 à -14 LUFS. Plafond True Peak à -1 dBTP.",
+      "metrics": {
+        "LUFS_I":        { "min": -18.0, "max": -14.0, "target": -16.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 }
+      }
+    },
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "description": "YouTube normalise à -14 LUFS. Fenêtre de livraison : -18 à -9 LUFS. Plafond True Peak à -1 dBTP recommandé.",
+      "metrics": {
+        "LUFS_I":        { "min": -18.0, "max": -9.0, "target": -14.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 }
+      }
+    },
+    {
+      "id": "tidal_amazon",
+      "label": "Tidal / Amazon Music",
+      "description": "Tidal et Amazon Music normalisent autour de -14 LUFS. Fenêtre de livraison : -18 à -9 LUFS. Plafond True Peak à -1 dBTP.",
+      "metrics": {
+        "LUFS_I":        { "min": -18.0, "max": -9.0, "target": -14.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 }
+      }
+    },
+    {
+      "id": "netflix",
+      "label": "Netflix (OTT vidéo)",
+      "description": "Spécification Netflix OC-3-1 : cible -27 LUFS (dialogue-gated). Plage acceptable : -28 à -24 LUFS. Plafond True Peak à -2 dBTP. LRA max 20 LU.",
+      "metrics": {
+        "LUFS_I":        { "min": -28.0, "max": -24.0, "target": -27.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -2.0 },
+        "LRA":           { "min": null,  "max": 20.0 }
+      }
+    },
+    {
+      "id": "cd_mastering",
+      "label": "CD Mastering",
+      "description": "Pratique courante de mastering CD : plafond brut à -0.1 dBFS pour éviter le clipping inter-sample. True Peak recommandé à -0.3 dBTP.",
+      "metrics": {
+        "Peak_dBFS":     { "min": null, "max": -0.1 },
+        "TruePeak_dBTP": { "min": null, "max": -0.3 }
+      }
+    },
+    {
+      "id": "podcast_apple",
+      "label": "Apple Podcasts",
+      "description": "Recommandations Apple Podcasts : -16 LUFS intégré (±1 LU). Plafond True Peak à -1 dBTP.",
+      "metrics": {
+        "LUFS_I":        { "min": -17.0, "max": -15.0, "target": -16.0 },
+        "TruePeak_dBTP": { "min": null,  "max": -1.0 }
+      }
+    },
+    {
+      "id": "custom",
+      "label": "Custom (modifier reference_models.json)",
+      "description": "Preset personnalisé. Modifiez les valeurs min/max dans reference_models.json. Utilisez null pour désactiver une borne.",
+      "metrics": {
+        "LUFS_I":        { "min": null, "max": null, "target": null },
+        "TruePeak_dBTP": { "min": null, "max": null },
+        "Peak_dBFS":     { "min": null, "max": null },
+        "RMS_dBFS":      { "min": null, "max": null },
+        "LRA":           { "min": null, "max": null }
+      }
+    }
+  ]
+}

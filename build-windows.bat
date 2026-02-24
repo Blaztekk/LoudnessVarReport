@@ -16,22 +16,22 @@ if not exist "version#" (
     set VERSION_OK=0
 ) else (
     for /f "usebackq delims=" %%A in ("version#") do set CURRENT_VERSION=%%A
-    set CURRENT_VERSION=%CURRENT_VERSION: =%
+    set "CURRENT_VERSION=!CURRENT_VERSION: =!"
 
-    for /f "tokens=1-3 delims=." %%a in ("%CURRENT_VERSION%") do (
-        set MAJOR=%%a
-        set MINOR=%%b
-        set PATCH=%%c
+    for /f "tokens=1-3 delims=." %%a in ("!CURRENT_VERSION!") do (
+        set "MAJOR=%%a"
+        set "MINOR=%%b"
+        set "PATCH=%%c"
     )
 
-    if "%MAJOR%"=="" (
-        echo ERROR: Invalid version in version#: "%CURRENT_VERSION%". Building without version suffix.
+    if "!MAJOR!"=="" (
+        echo ERROR: Invalid version in version#: "!CURRENT_VERSION!". Building without version suffix.
         set VERSION_OK=0
     )
-    if "%MINOR%"=="" set VERSION_OK=0
-    if "%PATCH%"=="" set VERSION_OK=0
-    if "%VERSION_OK%"=="0" (
-        echo ERROR: Invalid version in version#: "%CURRENT_VERSION%". Expected MAJOR.MINOR.PATCH (e.g. 1.0.1).
+    if "!MINOR!"=="" set VERSION_OK=0
+    if "!PATCH!"=="" set VERSION_OK=0
+    if "!VERSION_OK!"=="0" (
+        echo ERROR: Invalid version in version#: "!CURRENT_VERSION!". Expected MAJOR.MINOR.PATCH ^(e.g. 1.0.1^).
     )
 )
 
@@ -40,20 +40,20 @@ if "%VERSION_OK%"=="1" (
     set MINOR_BAD=
     set PATCH_BAD=
 
-    for /f "delims=0123456789" %%i in ("%MAJOR%") do set MAJOR_BAD=%%i
-    for /f "delims=0123456789" %%i in ("%MINOR%") do set MINOR_BAD=%%i
-    for /f "delims=0123456789" %%i in ("%PATCH%") do set PATCH_BAD=%%i
+    for /f "delims=0123456789" %%i in ("!MAJOR!") do set MAJOR_BAD=%%i
+    for /f "delims=0123456789" %%i in ("!MINOR!") do set MINOR_BAD=%%i
+    for /f "delims=0123456789" %%i in ("!PATCH!") do set PATCH_BAD=%%i
 
-    if not "%MAJOR_BAD%"=="" set VERSION_OK=0
-    if not "%MINOR_BAD%"=="" set VERSION_OK=0
-    if not "%PATCH_BAD%"=="" set VERSION_OK=0
+    if not "!MAJOR_BAD!"=="" set VERSION_OK=0
+    if not "!MINOR_BAD!"=="" set VERSION_OK=0
+    if not "!PATCH_BAD!"=="" set VERSION_OK=0
 )
 
 if "%VERSION_OK%"=="1" (
-    set /a PATCH_NUM=%PATCH%+1
-    set NEXT_VERSION=%MAJOR%.%MINOR%.%PATCH_NUM%
-    echo Current version: %CURRENT_VERSION%
-    echo Next version   : %NEXT_VERSION%
+    set /a PATCH_NUM=!PATCH!+1
+    set "NEXT_VERSION=!MAJOR!.!MINOR!.!PATCH_NUM!"
+    echo Current version: !CURRENT_VERSION!
+    echo Next version   : !NEXT_VERSION!
 ) else (
     set LOUDSCAN_VERSION=
 )
@@ -99,7 +99,7 @@ if %errorlevel% neq 0 (
 
 :: Persist version bump only after a successful build
 if "%VERSION_OK%"=="1" (
-    >"version#" echo %NEXT_VERSION%
+    >"version#" echo !NEXT_VERSION!
 )
 
 echo [3/3] Cleaning up temporary files...
