@@ -31,6 +31,26 @@ def get_loudness_from_file(path: str) -> dict:
 
     j = json.loads(matches[-1])
 
+    # Pass 2 : volumedetect → Peak dBFS (max_volume) + RMS dBFS (mean_volume)
+    cmd_vol = ["ffmpeg", "-hide_banner", "-nostats", "-i", path]
+    if ext in VIDEO_EXTS:
+        cmd_vol += ["-vn"]
+    cmd_vol += ["-af", "volumedetect", "-f", "null", "-"]
+
+    result_vol = subprocess.run(
+        cmd_vol,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        encoding="utf-8",
+        errors="replace",
+    )
+    vol_out = result_vol.stdout or ""
+
+    peak_m = re.search(r"max_volume:\s*([-\d.]+)\s*dB", vol_out)
+    rms_m  = re.search(r"mean_volume:\s*([-\d.]+)\s*dB", vol_out)
+    peak_dbfs = float(peak_m.group(1)) if peak_m else None
+    rms_dbfs  = float(rms_m.group(1))  if rms_m  else None
+
     return {
         "FileName": os.path.basename(path),
         "Path": path,
@@ -39,5 +59,7 @@ def get_loudness_from_file(path: str) -> dict:
         "LUFS_I": float(j["input_i"]),
         "TruePeak_dBTP": float(j["input_tp"]),
         "LRA": float(j["input_lra"]),
+        "Peak_dBFS": peak_dbfs,
+        "RMS_dBFS": rms_dbfs,
         "Error": None,
     }

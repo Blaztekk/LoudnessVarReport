@@ -25,9 +25,16 @@ def new_sound_report_data(metrics: list) -> dict:
     lufs_vals = [float(m["LUFS_I"]) for m in ok]
     tp_vals = [float(m["TruePeak_dBTP"]) for m in ok]
     lra_vals = [float(m["LRA"]) for m in ok]
+    peak_vals = [float(m["Peak_dBFS"]) for m in ok if m.get("Peak_dBFS") is not None]
+    rms_vals  = [float(m["RMS_dBFS"])  for m in ok if m.get("RMS_dBFS")  is not None]
 
     def _mean(vals):
         return sum(vals) / len(vals)
+
+    def _safe_stats(vals):
+        if not vals:
+            return {"mean": None, "median": None, "std": None}
+        return {"mean": _mean(vals), "median": get_median(vals), "std": get_stddev(vals)}
 
     stats = {
         "LUFS_I": {
@@ -45,6 +52,8 @@ def new_sound_report_data(metrics: list) -> dict:
             "median": get_median(lra_vals),
             "std": get_stddev(lra_vals),
         },
+        "Peak_dBFS": _safe_stats(peak_vals),
+        "RMS_dBFS":  _safe_stats(rms_vals),
     }
 
     files_enriched = []
@@ -62,6 +71,8 @@ def new_sound_report_data(metrics: list) -> dict:
                 "LUFS_I": None,
                 "TruePeak_dBTP": None,
                 "LRA": None,
+                "Peak_dBFS": None,
+                "RMS_dBFS": None,
                 "LUFS_DeltaMean": None,
                 "LUFS_DeltaMedian": None,
                 "LUFS_Z": None,
@@ -96,6 +107,8 @@ def new_sound_report_data(metrics: list) -> dict:
             "LUFS_I": lufs,
             "TruePeak_dBTP": tp,
             "LRA": lra,
+            "Peak_dBFS": m.get("Peak_dBFS"),
+            "RMS_dBFS": m.get("RMS_dBFS"),
             "LUFS_DeltaMean": lufs - stats["LUFS_I"]["mean"],
             "LUFS_DeltaMedian": lufs - stats["LUFS_I"]["median"],
             "LUFS_Z": lufs_z,
@@ -189,7 +202,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
     # CSV
     fieldnames = [
         "Section", "FileName", "Ext", "SizeBytes", "Path",
-        "LUFS_I", "TruePeak_dBTP", "LRA",
+        "LUFS_I", "TruePeak_dBTP", "LRA", "Peak_dBFS", "RMS_dBFS",
         "LUFS_DeltaMean", "LUFS_DeltaMedian", "LUFS_Z",
         "TP_DeltaMean", "TP_DeltaMedian", "TP_Z",
         "LRA_DeltaMean", "LRA_DeltaMedian", "LRA_Z",
@@ -208,6 +221,8 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "LUFS_I": r["LUFS_I"],
             "TruePeak_dBTP": r["TruePeak_dBTP"],
             "LRA": r["LRA"],
+            "Peak_dBFS": r.get("Peak_dBFS"),
+            "RMS_dBFS": r.get("RMS_dBFS"),
             "LUFS_DeltaMean": r["LUFS_DeltaMean"],
             "LUFS_DeltaMedian": r["LUFS_DeltaMedian"],
             "LUFS_Z": r["LUFS_Z"],
@@ -236,6 +251,8 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
             "LUFS_I": None,
             "TruePeak_dBTP": None,
             "LRA": None,
+            "Peak_dBFS": None,
+            "RMS_dBFS": None,
             "LUFS_DeltaMean": None,
             "LUFS_DeltaMedian": None,
             "LUFS_Z": None,
@@ -305,10 +322,12 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
         return f"<span class='thhelp' data-tip='{t}'>{lab} <span class='q'>?</span></span>"
 
     th_lufs = th_help("LUFS_I", "Loudness int\u00e9gr\u00e9e (LUFS, EBU R128). Plus proche de 0 = plus fort (moyenne per\u00e7ue).")
-    th_tp = th_help("TruePeak (dBTP)", "Pic vrai estim\u00e9 (intersample). Plus proche de 0 = plus de risque de clipping.")
-    th_lra = th_help("LRA", "Loudness Range (dynamique). Plus grand = plus dynamique.")
+    th_tp   = th_help("TruePeak (dBTP)", "Pic vrai estim\u00e9 (intersample). \u26a0 Rouge si \u2265 0 dB = saturation num\u00e9rique !")
+    th_lra  = th_help("LRA", "Loudness Range (dynamique). Plus grand = plus dynamique.")
+    th_peak = th_help("Peak (dBFS)", "Pic entier brut (volumedetect). \u26a0 Rouge si \u2265 0 dB = saturation num\u00e9rique !")
+    th_rms  = th_help("RMS (dBFS)", "Niveau RMS moyen (volumedetect). \u00c9quivalent puissance moyenne per\u00e7ue.")
     th_dmax = th_help("\u0394Max", "Distance paires: \u0394Max = max(|\u0394LUFS|, |\u0394TruePeak|).")
-    th_sim = th_help("Similarit\u00e9", "Cat\u00e9gories heuristiques sur \u0394Max.")
+    th_sim  = th_help("Similarit\u00e9", "Cat\u00e9gories heuristiques sur \u0394Max.")
 
     # Metrics rows
     metrics_rows_parts = []
@@ -320,15 +339,32 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
 
         if not err_txt:
             lufs = format_num(float(m["LUFS_I"]))
-            tp = format_num(float(m["TruePeak_dBTP"]))
-            lra = format_num(float(m["LRA"]))
+            tp   = format_num(float(m["TruePeak_dBTP"]))
+            lra  = format_num(float(m["LRA"]))
+            tp_clip  = " data-clipping='1'" if float(m["TruePeak_dBTP"]) >= 0 else ""
             lufs_cell = f"<span class='metricbox' data-metric='LUFS_I' data-value='{lufs}'>{lufs}</span>"
-            tp_cell = f"<span class='metricbox' data-metric='TruePeak_dBTP' data-value='{tp}'>{tp}</span>"
-            lra_cell = f"<span class='metricbox' data-metric='LRA' data-value='{lra}'>{lra}</span>"
+            tp_cell   = f"<span class='metricbox' data-metric='TruePeak_dBTP' data-value='{tp}'{tp_clip}>{tp}</span>"
+            lra_cell  = f"<span class='metricbox' data-metric='LRA' data-value='{lra}'>{lra}</span>"
+
+            raw_peak = m.get("Peak_dBFS")
+            raw_rms  = m.get("RMS_dBFS")
+            if raw_peak is not None:
+                peak_str  = format_num(float(raw_peak))
+                peak_clip = " data-clipping='1'" if float(raw_peak) >= 0 else ""
+                peak_cell = f"<span class='metricbox' data-metric='Peak_dBFS' data-value='{peak_str}'{peak_clip}>{peak_str}</span>"
+            else:
+                peak_cell = "<span class='metricbox dim'>\u2014</span>"
+            if raw_rms is not None:
+                rms_str  = format_num(float(raw_rms))
+                rms_cell = f"<span class='metricbox' data-metric='RMS_dBFS' data-value='{rms_str}'>{rms_str}</span>"
+            else:
+                rms_cell = "<span class='metricbox dim'>\u2014</span>"
         else:
             lufs_cell = "<span class='metricbox dim'>\u2014</span>"
-            tp_cell = "<span class='metricbox dim'>\u2014</span>"
-            lra_cell = "<span class='metricbox dim'>\u2014</span>"
+            tp_cell   = "<span class='metricbox dim'>\u2014</span>"
+            lra_cell  = "<span class='metricbox dim'>\u2014</span>"
+            peak_cell = "<span class='metricbox dim'>\u2014</span>"
+            rms_cell  = "<span class='metricbox dim'>\u2014</span>"
 
         metrics_rows_parts.append(
             f"<tr>\n"
@@ -338,6 +374,8 @@ def new_sound_report_html(folder: str, report: dict, html_path: str) -> str:
             f"  <td class='num'>{lufs_cell}</td>\n"
             f"  <td class='num'>{tp_cell}</td>\n"
             f"  <td class='num'>{lra_cell}</td>\n"
+            f"  <td class='num'>{peak_cell}</td>\n"
+            f"  <td class='num'>{rms_cell}</td>\n"
             f"  <td>{status}</td>\n"
             f"  <td style='max-width:520px; word-break:break-all;'>{html_escape(m['Path'])}</td>\n"
             f"  <td style='max-width:520px; color:#ffb2b2;'>{err_txt}</td>\n"
@@ -434,6 +472,11 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
   font-weight:700;
 }
 .metricbox.dim{opacity:.55; font-weight:600}
+.metricbox.clip-warn{
+  background:rgba(220,40,40,.38) !important;
+  border-color:rgba(255,70,70,.92) !important;
+  color:#ffaaaa !important;
+}
 .thhelp{
   display:inline-flex; align-items:center; gap:6px;
   cursor:help;
@@ -500,18 +543,21 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
   }}
 
   function getRef(method, metric){{
-    if (method === "median") return stats[metric].median;
-    return stats[metric].mean;
+    if (!stats[metric]) return 0;
+    const v = (method === "median") ? stats[metric].median : stats[metric].mean;
+    return (v != null) ? v : 0;
   }}
   function getScale(method, metric){{
+    if (!stats[metric]) return 1;
     const s = stats[metric].std || 0;
     if (method === "zscore") return 2.0;
     const fallback = (metric === "LRA") ? 2.0 : 1.0;
     return Math.max(2.0 * s, fallback);
   }}
   function computeDelta(method, metric, value){{
+    if (!stats[metric]) return 0;
     const ref = getRef(method, metric);
-    const std = stats[metric].std || 0;
+    const std = (stats[metric].std != null) ? stats[metric].std : 0;
     if (method === "zscore"){{
       if (std <= 1e-9) return 0.0;
       return (value - ref) / std;
@@ -552,6 +598,15 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
     }} else {{
       legend.textContent = "Couleurs (\u0394 vs moyenne): bleu=en dessous, vert=proche, rouge=au dessus (\u00e9chelle \u2248 \u00b12\u00d7\u03c3, fallback si \u03c3\u22480).";
     }}
+
+    // Saturation absolue : rouge si >= 0 dB (priorité maximale, écrase la coloration relative)
+    document.querySelectorAll(".metricbox[data-clipping='1']").forEach(el => {{
+      el.classList.add("clip-warn");
+      el.title += " \u26a0 SATURATION \u2265 0 dB !";
+    }});
+    document.querySelectorAll(".metricbox:not([data-clipping='1'])").forEach(el => {{
+      el.classList.remove("clip-warn");
+    }});
   }}
 
   function showTooltip(e, text){{
@@ -677,6 +732,8 @@ th.sortable[data-sort="desc"] .sort-ind{opacity:1; color:var(--accent);}
               <th class="num sortable">{th_lufs} <span class="sort-ind">↕</span></th>
               <th class="num sortable">{th_tp} <span class="sort-ind">↕</span></th>
               <th class="num sortable">{th_lra} <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_peak} <span class="sort-ind">↕</span></th>
+              <th class="num sortable">{th_rms} <span class="sort-ind">↕</span></th>
               <th class="sortable">Statut <span class="sort-ind">↕</span></th>
               <th>Chemin</th>
               <th>Erreur</th>
