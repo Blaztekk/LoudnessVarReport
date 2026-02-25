@@ -73,7 +73,7 @@ if %errorlevel% equ 0 (
 )
 
 echo [1/3] Installing build dependencies...
-%PYTHON% -m pip install -r requirements.txt --quiet
+%PYTHON% -m pip install -r requirements-build.txt --quiet
 if %errorlevel% neq 0 (
     echo ERROR: pip install failed.
     exit /b 1

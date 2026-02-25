@@ -141,7 +141,7 @@ python sound_report.py
 Builds are intended to be done locally and uploaded to GitHub Releases.
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-build.txt
 pyinstaller --clean --noconfirm loudscan.spec
 ```
 
