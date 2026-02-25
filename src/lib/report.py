@@ -235,7 +235,7 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
     # Resolve reference_models.json with priority:
     #  1. Next to the executable (user-editable override)
     #  2. Bundled inside the PyInstaller archive (_MEIPASS)
-    #  3. Project root when running from source
+    #  3. res/ subfolder at project root when running from source
     def _find_json():
         if getattr(sys, "frozen", False):
             exe_dir = os.path.dirname(sys.executable)
@@ -244,8 +244,8 @@ def write_sound_report_outputs(folder: str, report: dict) -> dict:
                 return candidate
             bundled = os.path.join(sys._MEIPASS, "reference_models.json")
             return bundled if os.path.exists(bundled) else None
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        candidate = os.path.join(root, "reference_models.json")
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        candidate = os.path.join(root, "res", "reference_models.json")
         return candidate if os.path.exists(candidate) else None
 
     _json_path = _find_json()

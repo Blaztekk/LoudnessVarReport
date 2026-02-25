@@ -4,6 +4,9 @@
 
 Drop a folder full of MP3s, WAVs, MP4s or any other common format and LoudScan will analyse every file with FFmpeg, then produce a self-contained HTML report and a CSV export so you can instantly spot which files are too loud, too quiet, or inconsistent.
 
+## Example of the begining of report html : 
+![Visual coulored Per-file metrics](res/image.png)
+
 ---
 
 ## Download
@@ -94,9 +97,9 @@ Colour legend for broadcast modes: **Blue** = below minimum · **Green** = withi
 
 The presets are read from `reference_models.json` at report-generation time. You can add, remove, or edit presets freely — LoudScan will pick them up without rebuilding.
 
-**When running from source** — edit `reference_models.json` at the project root.
+**When running from source** — edit `res/reference_models.json` in the project root.
 
-**When running the pre-built executable** — place a `reference_models.json` file **in the same folder as the executable**. If present, it takes priority over the version bundled at build time.
+**When running the build executable** — place a `reference_models.json` file **in the same folder as the executable**. If present, it takes priority over the version bundled at build time.
 
 #### JSON schema
 
